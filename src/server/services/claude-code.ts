@@ -1,7 +1,6 @@
 import { spawn } from 'child_process';
 import { v4 as uuid } from 'uuid';
 import type { AnimationIdea } from './anthropic';
-import { detectSkillsFromPrompt, getCombinedSkillContent } from '../../skills';
 
 export interface GenerationJob {
   id: string;
@@ -16,13 +15,7 @@ export interface GenerationJob {
 const jobs = new Map<string, GenerationJob>();
 
 function buildComponentPrompt(idea: AnimationIdea): string {
-  // Detect relevant skills based on the idea
-  const skillIds = detectSkillsFromPrompt(
-    `${idea.title} ${idea.description} ${idea.motion} ${idea.elements.join(' ')}`
-  );
-  const skillContent = skillIds.length > 0 ? getCombinedSkillContent(skillIds) : '';
-
-  return `You are an expert Remotion developer. Generate a complete, self-contained Remotion component based on this animation concept.
+  return `Generate a Remotion component for this animation concept:
 
 ## Animation Concept
 Title: ${idea.title}
@@ -35,15 +28,9 @@ Elements: ${idea.elements.join(', ')}
 
 ## Requirements
 1. Export a React component named "MyAnimation" as the default export
-2. Use ONLY Remotion imports: { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Sequence } from 'remotion'
-3. Define ALL customizable values (colors, text, sizes, timing) as NAMED CONSTANTS at the top of the component
-4. Use spring() for organic motion, interpolate() for linear transitions
-5. Always use { extrapolateRight: 'clamp' } or { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' } with interpolate
-6. Do NOT use setTimeout, setInterval, useEffect for animations, or CSS animations
-7. Do NOT import external images or assets
-8. The component must be self-contained and work immediately
-
-${skillContent ? `## Relevant Patterns\n${skillContent}` : ''}
+2. Define ALL customizable values (colors, text, sizes, timing) as NAMED CONSTANTS at the top
+3. The component must be self-contained and work immediately
+4. Do NOT import external images or assets
 
 ## Output
 Return ONLY the TypeScript/TSX code. No explanations, no markdown code blocks, just the raw code starting with import statements.`;
