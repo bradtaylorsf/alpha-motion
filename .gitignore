@@ -28,6 +28,8 @@ npm-debug.log*
 # Generated
 src/remotion/generated/*.tsx
 !src/remotion/generated/.gitkeep
+public/assets/generated/*
+!public/assets/generated/.gitkeep
 
 # Cache
 .cache/
