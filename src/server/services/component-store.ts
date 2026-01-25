@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { db, schema } from '../db';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import type { AnimationIdea } from './anthropic';
 
 export interface CreateComponentInput {
@@ -58,7 +58,7 @@ export async function getComponent(id: string): Promise<schema.Component | null>
 }
 
 export async function getAllComponents(): Promise<schema.Component[]> {
-  return db.select().from(schema.components).orderBy(schema.components.createdAt);
+  return db.select().from(schema.components).orderBy(desc(schema.components.createdAt));
 }
 
 export async function updateComponent(

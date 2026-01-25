@@ -31,3 +31,9 @@ export interface GenerationJob {
   error?: string;
   component?: Component;
 }
+
+// A board item can be either a completed component or a generation in progress
+export type BoardItem =
+  | { type: 'component'; data: Component }
+  | { type: 'generating'; id: string; idea: AnimationIdea; status: 'queued' | 'generating'; startedAt: number }
+  | { type: 'failed'; id: string; idea: AnimationIdea; error: string; startedAt: number }

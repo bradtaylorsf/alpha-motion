@@ -68,7 +68,12 @@ router.get('/:jobId/status', async (req, res) => {
         ].filter(Boolean),
       });
 
-      response.component = component;
+      // Parse JSON fields before returning (they're stored as strings in DB)
+      response.component = {
+        ...component,
+        tags: component.tags ? JSON.parse(component.tags) : [],
+        ideaJson: component.ideaJson ? JSON.parse(component.ideaJson) : null,
+      };
     }
 
     res.json(response);

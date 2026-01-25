@@ -3,7 +3,7 @@ import { RemotionPreview } from './RemotionPreview';
 import { CodeViewer } from './CodeViewer';
 import { getComponentSource } from '../../lib/api';
 import type { Component } from '../../types';
-import { cn } from '../../lib/utils';
+import { cn, parseTags } from '../../lib/utils';
 
 interface PreviewModalProps {
   component: Component;
@@ -131,18 +131,21 @@ export function PreviewModal({ component, onClose }: PreviewModalProps) {
           <span>{component.fps}fps</span>
           <span>|</span>
           <span>{component.durationFrames} frames</span>
-          {component.tags.length > 0 && (
-            <>
-              <span>|</span>
-              <div className="flex gap-1">
-                {component.tags.map((tag, i) => (
-                  <span key={i} className="rounded bg-secondary px-2 py-0.5 text-xs">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
+          {(() => {
+            const tags = parseTags(component.tags);
+            return tags.length > 0 && (
+              <>
+                <span>|</span>
+                <div className="flex gap-1">
+                  {tags.map((tag, i) => (
+                    <span key={i} className="rounded bg-secondary px-2 py-0.5 text-xs">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>
