@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { db, schema } from '../db';
-import { eq, desc, isNull } from 'drizzle-orm';
+import { eq, desc, isNull, inArray } from 'drizzle-orm';
 import { deleteImageFile } from './nano-bananas';
 
 export interface CreateAssetInput {
@@ -42,6 +42,27 @@ export async function createAsset(input: CreateAssetInput): Promise<schema.Asset
 export async function getAsset(id: string): Promise<schema.Asset | null> {
   const results = await db.select().from(schema.assets).where(eq(schema.assets.id, id));
   return results[0] ?? null;
+}
+
+/**
+ * Batch fetch multiple assets by IDs in a single query.
+ * Returns a Map for O(1) lookup by ID.
+ */
+export async function getAssetsByIds(ids: string[]): Promise<Map<string, schema.Asset>> {
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const results = await db
+    .select()
+    .from(schema.assets)
+    .where(inArray(schema.assets.id, ids));
+
+  const assetMap = new Map<string, schema.Asset>();
+  for (const asset of results) {
+    assetMap.set(asset.id, asset);
+  }
+  return assetMap;
 }
 
 export async function getAllAssets(): Promise<schema.Asset[]> {

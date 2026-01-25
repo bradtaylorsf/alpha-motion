@@ -8,6 +8,7 @@ export function useExport() {
   const [status, setStatus] = useState<RenderJob['status'] | null>(null);
   const [progress, setProgress] = useState(0);
   const [outputPath, setOutputPath] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -45,13 +46,15 @@ export function useExport() {
     setStatus('queued');
     setProgress(0);
     setOutputPath(null);
+    setJobId(null);
     setError(null);
 
     try {
-      const jobId = await startRender(componentId, options);
+      const newJobId = await startRender(componentId, options);
+      setJobId(newJobId);
       setStatus('rendering');
       // Start polling
-      pollRef.current = setTimeout(() => pollStatus(jobId), POLL_INTERVAL);
+      pollRef.current = setTimeout(() => pollStatus(newJobId), POLL_INTERVAL);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start render');
       setStatus(null);
@@ -63,6 +66,7 @@ export function useExport() {
     setStatus(null);
     setProgress(0);
     setOutputPath(null);
+    setJobId(null);
     setError(null);
   }, [stopPolling]);
 
@@ -71,10 +75,14 @@ export function useExport() {
     return () => stopPolling();
   }, [stopPolling]);
 
+  // Download URL uses the streaming endpoint to avoid proxy buffering
+  const downloadUrl = jobId ? `/api/render/${jobId}/download` : null;
+
   return {
     status,
     progress,
     outputPath,
+    downloadUrl,
     error,
     isExporting: status === 'queued' || status === 'rendering',
     startExport,

@@ -134,7 +134,8 @@ export function useBoardItems() {
     return pending;
   }, []);
 
-  // Remix an existing component - creates a new pending idea with its settings (saves to DB immediately)
+  // Remix an existing component - creates a new pending idea with its settings
+  // Uses optimistic UI: returns immediately, fetches assets in background
   const remixComponent = useCallback(async (component: Component): Promise<PendingIdea> => {
     // Build the idea from component data
     const idea: AnimationIdea = component.ideaJson || {
@@ -156,22 +157,39 @@ export function useBoardItems() {
       height: component.height,
     };
 
-    // Fetch assets linked to this component
-    let componentAssets: Asset[] = [];
-    try {
-      componentAssets = await getAssets(component.id);
-    } catch (e) {
-      console.error('Failed to fetch component assets for remix:', e);
-    }
-
-    // Create pending idea in DB with asset IDs
+    // Create pending idea immediately WITHOUT assets (optimistic)
     const pending = await apiCreatePendingIdea(
       { ...idea, title: `${idea.title} (Remix)` },
       settings,
-      componentAssets.map((a) => a.id)
+      [] // Start with no assets - will load in background
     );
 
     setPendingIdeas((prev) => [pending, ...prev]);
+
+    // Fetch assets in background and update the pending idea
+    getAssets(component.id)
+      .then(async (componentAssets) => {
+        if (componentAssets.length > 0) {
+          // Add each asset to the pending idea
+          for (const asset of componentAssets) {
+            try {
+              await apiAddAssetToPendingIdea(pending.id, asset.id);
+            } catch (e) {
+              console.error('Failed to add asset to pending idea:', e);
+            }
+          }
+          // Update local state with all assets
+          setPendingIdeas((prev) =>
+            prev.map((p) =>
+              p.id === pending.id ? { ...p, assets: componentAssets } : p
+            )
+          );
+        }
+      })
+      .catch((e) => {
+        console.error('Failed to fetch component assets for remix:', e);
+      });
+
     return pending;
   }, []);
 

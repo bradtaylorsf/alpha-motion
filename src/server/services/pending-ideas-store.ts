@@ -2,7 +2,7 @@ import { eq, desc } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
 import { db } from '../db';
 import { pendingIdeas } from '../db/schema';
-import { getAsset } from './asset-store';
+import { getAssetsByIds } from './asset-store';
 
 export interface AnimationIdea {
   title: string;
@@ -48,20 +48,18 @@ export async function getPendingIdea(id: string) {
   const result = await db.select().from(pendingIdeas).where(eq(pendingIdeas.id, id)).get();
   if (!result) return null;
 
-  // Parse JSON fields and fetch assets
+  // Parse JSON fields and fetch assets in a single batch query
   const assetIds: string[] = result.assetIds ? JSON.parse(result.assetIds) : [];
-  const assets = await Promise.all(
-    assetIds.map(async (assetId) => {
-      const asset = await getAsset(assetId);
-      return asset;
-    })
-  );
+  const assetMap = await getAssetsByIds(assetIds);
+
+  // Preserve order from assetIds array
+  const assets = assetIds.map((id) => assetMap.get(id)).filter(Boolean);
 
   return {
     id: result.id,
     idea: JSON.parse(result.ideaJson) as AnimationIdea,
     settings: JSON.parse(result.settingsJson) as GenerationSettings,
-    assets: assets.filter(Boolean),
+    assets,
     createdAt: result.createdAt,
     updatedAt: result.updatedAt,
   };
@@ -74,26 +72,31 @@ export async function getAllPendingIdeas() {
     .orderBy(desc(pendingIdeas.createdAt))
     .all();
 
-  return Promise.all(
-    results.map(async (result) => {
-      const assetIds: string[] = result.assetIds ? JSON.parse(result.assetIds) : [];
-      const assets = await Promise.all(
-        assetIds.map(async (assetId) => {
-          const asset = await getAsset(assetId);
-          return asset;
-        })
-      );
+  // Collect all unique asset IDs across all pending ideas
+  const allAssetIds = new Set<string>();
+  const parsedResults = results.map((result) => {
+    const assetIds: string[] = result.assetIds ? JSON.parse(result.assetIds) : [];
+    assetIds.forEach((id) => allAssetIds.add(id));
+    return {
+      result,
+      assetIds,
+      idea: JSON.parse(result.ideaJson) as AnimationIdea,
+      settings: JSON.parse(result.settingsJson) as GenerationSettings,
+    };
+  });
 
-      return {
-        id: result.id,
-        idea: JSON.parse(result.ideaJson) as AnimationIdea,
-        settings: JSON.parse(result.settingsJson) as GenerationSettings,
-        assets: assets.filter(Boolean),
-        createdAt: result.createdAt,
-        updatedAt: result.updatedAt,
-      };
-    })
-  );
+  // Fetch ALL assets in a single batch query
+  const assetMap = await getAssetsByIds([...allAssetIds]);
+
+  // Map assets back to their pending ideas
+  return parsedResults.map(({ result, assetIds, idea, settings }) => ({
+    id: result.id,
+    idea,
+    settings,
+    assets: assetIds.map((id) => assetMap.get(id)).filter(Boolean),
+    createdAt: result.createdAt,
+    updatedAt: result.updatedAt,
+  }));
 }
 
 export async function updatePendingIdea(

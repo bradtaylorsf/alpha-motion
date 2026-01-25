@@ -75,7 +75,7 @@ export function ExportModal({ componentId, componentName, onClose }: ExportModal
   const [audioCodec, setAudioCodec] = useState<AudioCodec>('aac');
   const [proresProfile, setProresProfile] = useState<ProResProfile>('standard');
 
-  const { status, progress, outputPath, error, isExporting, startExport, reset } = useExport();
+  const { status, progress, outputPath, downloadUrl, error, isExporting, startExport, reset } = useExport();
 
   const config = CODEC_CONFIGS[codec];
 
@@ -180,7 +180,7 @@ export function ExportModal({ componentId, componentName, onClose }: ExportModal
                 </>
               )}
 
-              {status === 'complete' && outputPath && (
+              {status === 'complete' && downloadUrl && (
                 <div className="flex flex-col items-center gap-4 py-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10 text-green-500">
                     <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -189,7 +189,7 @@ export function ExportModal({ componentId, componentName, onClose }: ExportModal
                   </div>
                   <p className="text-sm text-muted-foreground">Export complete!</p>
                   <a
-                    href={outputPath}
+                    href={downloadUrl}
                     download
                     className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                   >

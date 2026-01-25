@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 import { startRender, getRenderStatus } from '../services/render';
 import { getComponent } from '../services/component-store';
 import type { ExportOptions, VideoCodec } from '../../shared/codec-config';
@@ -107,11 +109,66 @@ router.get('/:jobId/status', async (req, res) => {
       return res.status(404).json({ error: 'Render job not found' });
     }
 
+    // Debug: log what we're returning to the client
+    console.log(`[Render ${jobId}] Status poll: status=${job.status}, progress=${job.progress}%`);
+
     res.json(job);
   } catch (error) {
     console.error('Error fetching render status:', error);
     res.status(500).json({
       error: 'Failed to fetch render status',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Download endpoint - streams the file with proper headers for download
+router.get('/:jobId/download', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const job = getRenderStatus(jobId);
+
+    if (!job) {
+      return res.status(404).json({ error: 'Render job not found' });
+    }
+
+    if (job.status !== 'complete' || !job.outputPath) {
+      return res.status(400).json({ error: 'Render not complete' });
+    }
+
+    // Convert relative URL path to absolute file path
+    // outputPath is like "/assets/renders/uuid.mp4"
+    const relativePath = job.outputPath.replace(/^\//, ''); // Remove leading slash
+    const filePath = path.resolve(process.cwd(), 'public', relativePath);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Video file not found' });
+    }
+
+    // Get file stats for Content-Length
+    const stat = fs.statSync(filePath);
+    const filename = path.basename(filePath);
+
+    // Set headers for download
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    // Stream the file
+    const readStream = fs.createReadStream(filePath);
+    readStream.pipe(res);
+
+    readStream.on('error', (err) => {
+      console.error(`[Render ${jobId}] Download stream error:`, err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Failed to stream video' });
+      }
+    });
+  } catch (error) {
+    console.error('Error downloading render:', error);
+    res.status(500).json({
+      error: 'Failed to download render',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

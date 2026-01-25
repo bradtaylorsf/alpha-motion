@@ -133,12 +133,54 @@ registerRoot(Root);
 `;
 }
 
+// Strip ANSI escape codes from string
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '');
+}
+
 function parseProgress(line: string): number | null {
-  // Remotion outputs: "Rendered X of Y frames (Z%)"
-  const match = line.match(/\((\d+(?:\.\d+)?)%\)/);
+  // Strip ANSI codes that might interfere with parsing
+  const cleanLine = stripAnsi(line);
+
+  // Remotion outputs progress in various formats:
+  // - "Bundling 6%"
+  // - "Rendered 1/150, time remaining: 26s"
+  // - "Rendered X of Y frames (Z%)"
+  // - "Encoded 150/150"
+
+  // Try "X/Y" pattern (e.g., "Rendered 1/150" or "Encoded 50/150")
+  let match = cleanLine.match(/(?:Rendered|Encoded)\s+(\d+)\/(\d+)/i);
+  if (match) {
+    const current = parseInt(match[1], 10);
+    const total = parseInt(match[2], 10);
+    if (total > 0) {
+      return Math.round((current / total) * 100);
+    }
+  }
+
+  // Try pattern with parentheses: (Z%)
+  match = cleanLine.match(/\((\d+(?:\.\d+)?)%\)/);
   if (match) {
     return parseFloat(match[1]);
   }
+
+  // Try pattern without parentheses: Z% (e.g., "Bundling 6%")
+  match = cleanLine.match(/(\d+(?:\.\d+)?)%/);
+  if (match) {
+    return parseFloat(match[1]);
+  }
+
+  // Try "X of Y frames" pattern
+  match = cleanLine.match(/(\d+)\s+of\s+(\d+)\s+frames/i);
+  if (match) {
+    const current = parseInt(match[1], 10);
+    const total = parseInt(match[2], 10);
+    if (total > 0) {
+      return Math.round((current / total) * 100);
+    }
+  }
+
   return null;
 }
 
@@ -223,8 +265,18 @@ async function runRender(
       });
 
       remotion.stdout.on('data', (data) => {
-        const line = data.toString();
-        console.log(`[Render ${jobId}] stdout:`, line.trim());
+        const lines = data.toString().split('\n');
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          console.log(`[Render ${jobId}] stdout:`, line.trim());
+
+          // Parse progress from stdout (Remotion outputs progress here)
+          const progress = parseProgress(line);
+          if (progress !== null) {
+            job.progress = progress;
+            console.log(`[Render ${jobId}] Progress updated: ${progress}%`);
+          }
+        }
       });
 
       remotion.stderr.on('data', (data) => {
@@ -233,9 +285,11 @@ async function runRender(
           if (!line.trim()) continue;
           console.log(`[Render ${jobId}] stderr:`, line.trim());
 
+          // Also check stderr for progress (some versions output here)
           const progress = parseProgress(line);
           if (progress !== null) {
             job.progress = progress;
+            console.log(`[Render ${jobId}] Progress updated: ${progress}%`);
           }
         }
       });

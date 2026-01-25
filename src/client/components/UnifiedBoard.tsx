@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useBoardItems } from '../hooks/useBoardItems';
 import { IdeaInput } from './IdeaInput';
 import { BoardItemCard } from './BoardItemCard';
@@ -29,6 +29,22 @@ export function UnifiedBoard() {
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
   const [selectedPendingIdea, setSelectedPendingIdea] = useState<PendingIdea | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Sync selectedPendingIdea with updates from pendingIdeas array
+  // This handles background asset loading after remix
+  useEffect(() => {
+    if (selectedPendingIdea) {
+      const pendingItem = boardItems.find(
+        (item) => item.type === 'pending' && item.data.id === selectedPendingIdea.id
+      );
+      if (pendingItem && pendingItem.type === 'pending') {
+        // Only update if assets have changed (avoids unnecessary re-renders)
+        if (pendingItem.data.assets.length !== selectedPendingIdea.assets.length) {
+          setSelectedPendingIdea(pendingItem.data);
+        }
+      }
+    }
+  }, [boardItems, selectedPendingIdea]);
 
   const filteredItems = boardItems.filter((item) => {
     if (!searchQuery) return true;
