@@ -90,13 +90,13 @@ export async function generateRandomIdea(category?: string): Promise<AnimationId
   });
 
   const content = message.content[0];
-  if (content.type !== 'text') {
+  if (!content || content.type !== 'text') {
     throw new Error('Unexpected response type');
   }
 
   try {
     return JSON.parse(content.text) as AnimationIdea;
-  } catch (e) {
+  } catch {
     // Try to extract JSON from the response
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
@@ -119,13 +119,13 @@ export async function expandIdea(userIdea: string): Promise<AnimationIdea> {
   });
 
   const content = message.content[0];
-  if (content.type !== 'text') {
+  if (!content || content.type !== 'text') {
     throw new Error('Unexpected response type');
   }
 
   try {
     return JSON.parse(content.text) as AnimationIdea;
-  } catch (e) {
+  } catch {
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]) as AnimationIdea;

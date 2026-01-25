@@ -71,12 +71,12 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Component has no source code' });
     }
 
-    // Prepare video config
+    // Prepare video config with defaults for nullable values
     const videoConfig = {
-      width: component.width,
-      height: component.height,
-      fps: component.fps,
-      durationInFrames: component.durationFrames,
+      width: component.width ?? 1920,
+      height: component.height ?? 1080,
+      fps: component.fps ?? 30,
+      durationInFrames: component.durationFrames ?? 150,
     };
 
     // Prepare export options

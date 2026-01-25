@@ -3,9 +3,6 @@ import { v4 as uuid } from 'uuid';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import {
-  type VideoCodec,
-  type AudioCodec,
-  type ProResProfile,
   type ExportOptions,
   getExtension,
   getDefaultCrf,
@@ -63,7 +60,7 @@ function transformAssetPaths(sourceCode: string): { code: string; hasAssets: boo
   // Handles both single and double quotes
   const transformed = sourceCode.replace(
     /(['"`])\/assets\/(.*?)\1/g,
-    (match, quote, assetPath) => {
+    (_match, _quote, assetPath) => {
       hasAssets = true;
       // Use staticFile() for Remotion CLI rendering
       return `staticFile('assets/${assetPath}')`;
@@ -86,7 +83,7 @@ function ensureStaticFileImport(sourceCode: string): string {
 
     // Check if staticFile is in the import
     const remotionImportMatch = sourceCode.match(/import\s*\{([^}]+)\}\s*from\s*['"]remotion['"]/);
-    if (remotionImportMatch) {
+    if (remotionImportMatch && remotionImportMatch[1]) {
       const imports = remotionImportMatch[1];
       if (!imports.includes('staticFile')) {
         // Add staticFile to existing import
@@ -99,7 +96,7 @@ function ensureStaticFileImport(sourceCode: string): string {
 
   // Add staticFile to existing remotion import
   const remotionImportMatch = sourceCode.match(/import\s*\{([^}]+)\}\s*from\s*['"]remotion['"]/);
-  if (remotionImportMatch) {
+  if (remotionImportMatch && remotionImportMatch[1]) {
     const imports = remotionImportMatch[1];
     const newImports = imports.trim() + ', staticFile';
     return sourceCode.replace(remotionImportMatch[0], `import {${newImports}} from 'remotion'`);
@@ -109,7 +106,7 @@ function ensureStaticFileImport(sourceCode: string): string {
   return `import { staticFile } from 'remotion';\n${sourceCode}`;
 }
 
-function generateEntryPoint(componentPath: string, videoConfig: VideoConfig): string {
+function generateEntryPoint(_componentPath: string, videoConfig: VideoConfig): string {
   return `import { registerRoot } from 'remotion';
 import { Composition } from 'remotion';
 import MyAnimation from './Component';
@@ -151,7 +148,7 @@ function parseProgress(line: string): number | null {
 
   // Try "X/Y" pattern (e.g., "Rendered 1/150" or "Encoded 50/150")
   let match = cleanLine.match(/(?:Rendered|Encoded)\s+(\d+)\/(\d+)/i);
-  if (match) {
+  if (match && match[1] && match[2]) {
     const current = parseInt(match[1], 10);
     const total = parseInt(match[2], 10);
     if (total > 0) {
@@ -161,19 +158,19 @@ function parseProgress(line: string): number | null {
 
   // Try pattern with parentheses: (Z%)
   match = cleanLine.match(/\((\d+(?:\.\d+)?)%\)/);
-  if (match) {
+  if (match && match[1]) {
     return parseFloat(match[1]);
   }
 
   // Try pattern without parentheses: Z% (e.g., "Bundling 6%")
   match = cleanLine.match(/(\d+(?:\.\d+)?)%/);
-  if (match) {
+  if (match && match[1]) {
     return parseFloat(match[1]);
   }
 
   // Try "X of Y frames" pattern
   match = cleanLine.match(/(\d+)\s+of\s+(\d+)\s+frames/i);
-  if (match) {
+  if (match && match[1] && match[2]) {
     const current = parseInt(match[1], 10);
     const total = parseInt(match[2], 10);
     if (total > 0) {
