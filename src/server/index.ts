@@ -5,6 +5,7 @@ import generateRouter from './routes/generate';
 import componentsRouter from './routes/components';
 import assetsRouter from './routes/assets';
 import pendingIdeasRouter from './routes/pending-ideas';
+import renderRouter from './routes/render';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -22,6 +23,7 @@ app.use('/api/generate', generateRouter);
 app.use('/api/components', componentsRouter);
 app.use('/api/assets', assetsRouter);
 app.use('/api/pending-ideas', pendingIdeasRouter);
+app.use('/api/render', renderRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -50,6 +52,8 @@ const server = app.listen(PORT, () => {
   console.log('  POST /api/assets/generate - Generate image asset');
   console.log('  POST /api/assets/generate/batch - Generate multiple images');
   console.log('  GET  /api/assets        - List all assets');
+  console.log('  POST /api/render        - Start video render');
+  console.log('  GET  /api/render/:id/status - Check render status');
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {

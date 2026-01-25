@@ -34,3 +34,10 @@ public/assets/generated/*
 # Cache
 .cache/
 .turbo/
+
+# Render temp files
+.remotion-render/
+
+# Rendered videos
+public/assets/renders/*
+!public/assets/renders/.gitkeep

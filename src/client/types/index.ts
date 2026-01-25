@@ -66,3 +66,26 @@ export interface Asset {
   metadata: Record<string, unknown> | null;
   createdAt: string;
 }
+
+// Video export types
+export type VideoCodec = 'h264' | 'h265' | 'vp8' | 'vp9' | 'prores';
+export type AudioCodec = 'aac' | 'mp3' | 'opus' | 'pcm-16';
+export type ProResProfile = 'proxy' | 'light' | 'standard' | 'hq' | '4444' | '4444-xq';
+
+export interface ExportOptions {
+  codec: VideoCodec;
+  crf?: number;
+  audioCodec?: AudioCodec;
+  proresProfile?: ProResProfile;
+}
+
+export interface RenderJob {
+  id: string;
+  componentId: string;
+  status: 'queued' | 'rendering' | 'complete' | 'failed';
+  progress: number;
+  outputPath?: string;
+  error?: string;
+  startedAt?: string;
+  completedAt?: string;
+}

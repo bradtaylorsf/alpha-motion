@@ -1,4 +1,4 @@
-import type { AnimationIdea, Component, GenerationJob, Asset } from '../types';
+import type { AnimationIdea, Component, GenerationJob, Asset, ExportOptions, RenderJob } from '../types';
 
 const API_BASE = '/api';
 
@@ -229,4 +229,20 @@ export async function deletePendingIdea(id: string): Promise<void> {
   await fetchJson<{ success: boolean }>(`${API_BASE}/pending-ideas/${id}`, {
     method: 'DELETE',
   });
+}
+
+// Render API
+export async function startRender(
+  componentId: string,
+  options: ExportOptions
+): Promise<string> {
+  const result = await fetchJson<{ jobId: string }>(`${API_BASE}/render`, {
+    method: 'POST',
+    body: JSON.stringify({ componentId, options }),
+  });
+  return result.jobId;
+}
+
+export async function getRenderStatus(jobId: string): Promise<RenderJob> {
+  return fetchJson<RenderJob>(`${API_BASE}/render/${jobId}/status`);
 }
