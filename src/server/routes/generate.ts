@@ -1,20 +1,32 @@
 import { Router } from 'express';
 import { startGeneration, getJobStatus } from '../services/claude-code';
 import { createComponent } from '../services/component-store';
+import { linkAssetToComponent } from '../services/asset-store';
 import type { AnimationIdea } from '../services/anthropic';
 
 const router = Router();
 
+export interface GenerationOptions {
+  durationFrames?: number;
+  fps?: number;
+  width?: number;
+  height?: number;
+  assets?: { url: string; prompt: string; id: string }[];
+}
+
 router.post('/', async (req, res) => {
   try {
-    const { idea, options } = req.body;
+    const { idea, options } = req.body as { idea: AnimationIdea; options?: GenerationOptions };
     console.log('POST /api/generate - Received request:', idea?.title);
+    if (options?.assets?.length) {
+      console.log(`POST /api/generate - With ${options.assets.length} assets`);
+    }
 
     if (!idea || !idea.title || !idea.description) {
       return res.status(400).json({ error: 'Valid idea object is required' });
     }
 
-    const jobId = startGeneration(idea as AnimationIdea);
+    const jobId = startGeneration(idea, options);
     console.log(`POST /api/generate - Started job: ${jobId}`);
 
     res.json({
@@ -54,7 +66,7 @@ router.get('/:jobId/status', async (req, res) => {
     }
 
     if (job.status === 'complete' && job.result) {
-      // Save the component to database
+      // Save the component to database with options if provided
       const component = await createComponent({
         name: job.idea.title,
         description: job.idea.description,
@@ -66,7 +78,21 @@ router.get('/:jobId/status', async (req, res) => {
           job.idea.motion,
           ...job.idea.elements.slice(0, 3),
         ].filter(Boolean),
+        durationFrames: job.options?.durationFrames,
+        fps: job.options?.fps,
+        width: job.options?.width,
+        height: job.options?.height,
       });
+
+      // Link any assets to this component
+      if (job.options?.assets?.length) {
+        for (const asset of job.options.assets) {
+          if (asset.id) {
+            await linkAssetToComponent(asset.id, component.id);
+          }
+        }
+        console.log(`Linked ${job.options.assets.length} assets to component ${component.id}`);
+      }
 
       // Parse JSON fields before returning (they're stored as strings in DB)
       response.component = {

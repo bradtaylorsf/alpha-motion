@@ -3,6 +3,8 @@ import path from 'path';
 import ideasRouter from './routes/ideas';
 import generateRouter from './routes/generate';
 import componentsRouter from './routes/components';
+import assetsRouter from './routes/assets';
+import pendingIdeasRouter from './routes/pending-ideas';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -10,10 +12,16 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(express.json());
 
+// Serve generated assets
+const publicPath = path.resolve(process.cwd(), 'public');
+app.use('/assets', express.static(path.join(publicPath, 'assets')));
+
 // API Routes
 app.use('/api/ideas', ideasRouter);
 app.use('/api/generate', generateRouter);
 app.use('/api/components', componentsRouter);
+app.use('/api/assets', assetsRouter);
+app.use('/api/pending-ideas', pendingIdeasRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -39,6 +47,9 @@ const server = app.listen(PORT, () => {
   console.log('  GET  /api/generate/:id/status - Check generation status');
   console.log('  GET  /api/components    - List all components');
   console.log('  GET  /api/components/:id - Get single component');
+  console.log('  POST /api/assets/generate - Generate image asset');
+  console.log('  POST /api/assets/generate/batch - Generate multiple images');
+  console.log('  GET  /api/assets        - List all assets');
 });
 
 server.on('error', (err: NodeJS.ErrnoException) => {

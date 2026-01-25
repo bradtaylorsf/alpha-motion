@@ -3,8 +3,9 @@ import { useBoardItems } from '../hooks/useBoardItems';
 import { IdeaInput } from './IdeaInput';
 import { BoardItemCard } from './BoardItemCard';
 import { PreviewModal } from './preview/PreviewModal';
+import { IdeaEditModal } from './ideas/IdeaEditModal';
 import { parseTags } from '../lib/utils';
-import type { Component } from '../types';
+import type { Component, PendingIdea } from '../types';
 
 export function UnifiedBoard() {
   const {
@@ -13,13 +14,20 @@ export function UnifiedBoard() {
     error,
     isGeneratingIdeas,
     generateRandomIdeas,
-    expandAndGenerate,
+    expandAndCreatePending,
+    updatePendingIdea,
+    deletePendingIdea,
+    addAssetToPendingIdea,
+    removeAssetFromPendingIdea,
+    startGenerationFromPending,
+    remixComponent,
     deleteComponent,
     retryFailed,
     dismissFailed,
   } = useBoardItems();
 
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
+  const [selectedPendingIdea, setSelectedPendingIdea] = useState<PendingIdea | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredItems = boardItems.filter((item) => {
@@ -35,6 +43,13 @@ export function UnifiedBoard() {
       );
     }
 
+    if (item.type === 'pending') {
+      return (
+        item.data.idea.title.toLowerCase().includes(query) ||
+        item.data.idea.description.toLowerCase().includes(query)
+      );
+    }
+
     // For generating/failed items, search by idea title/description
     return (
       item.idea.title.toLowerCase().includes(query) ||
@@ -42,21 +57,28 @@ export function UnifiedBoard() {
     );
   });
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteComponent = async (id: string) => {
     if (confirm('Are you sure you want to delete this component?')) {
       await deleteComponent(id);
     }
   };
 
+  const handleDeletePending = (id: string) => {
+    if (confirm('Are you sure you want to discard this idea?')) {
+      deletePendingIdea(id);
+    }
+  };
+
   const componentCount = boardItems.filter((i) => i.type === 'component').length;
   const generatingCount = boardItems.filter((i) => i.type === 'generating').length;
+  const pendingCount = boardItems.filter((i) => i.type === 'pending').length;
 
   return (
     <div className="flex flex-col h-full">
       {/* Idea Input Section */}
       <IdeaInput
         onGenerateRandom={generateRandomIdeas}
-        onExpandIdea={expandAndGenerate}
+        onExpandIdea={expandAndCreatePending}
         isGenerating={isGeneratingIdeas}
       />
 
@@ -66,6 +88,11 @@ export function UnifiedBoard() {
         <div className="flex items-center justify-between border-b border-border p-4">
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold text-foreground">Your Components</h2>
+            {pendingCount > 0 && (
+              <span className="flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600">
+                {pendingCount} pending
+              </span>
+            )}
             {generatingCount > 0 && (
               <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
                 <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
@@ -119,7 +146,13 @@ export function UnifiedBoard() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredItems.map((item) => (
                 <BoardItemCard
-                  key={item.type === 'component' ? item.data.id : item.id}
+                  key={
+                    item.type === 'component'
+                      ? item.data.id
+                      : item.type === 'pending'
+                      ? item.data.id
+                      : item.id
+                  }
                   item={item}
                   onClick={
                     item.type === 'component'
@@ -128,7 +161,25 @@ export function UnifiedBoard() {
                   }
                   onDelete={
                     item.type === 'component'
-                      ? () => handleDelete(item.data.id)
+                      ? () => handleDeleteComponent(item.data.id)
+                      : undefined
+                  }
+                  onRemix={
+                    item.type === 'component'
+                      ? async () => {
+                          const pending = await remixComponent(item.data);
+                          setSelectedPendingIdea(pending);
+                        }
+                      : undefined
+                  }
+                  onPendingClick={
+                    item.type === 'pending'
+                      ? () => setSelectedPendingIdea(item.data)
+                      : undefined
+                  }
+                  onPendingDelete={
+                    item.type === 'pending'
+                      ? () => handleDeletePending(item.data.id)
                       : undefined
                   }
                   onRetry={
@@ -148,11 +199,51 @@ export function UnifiedBoard() {
         </div>
       </div>
 
-      {/* Preview Modal */}
+      {/* Preview Modal for completed components */}
       {selectedComponent && (
         <PreviewModal
           component={selectedComponent}
           onClose={() => setSelectedComponent(null)}
+          onRemix={async () => {
+            // Create a pending idea from the component
+            const pending = await remixComponent(selectedComponent);
+            // Close preview and open edit modal
+            setSelectedComponent(null);
+            setSelectedPendingIdea(pending);
+          }}
+        />
+      )}
+
+      {/* Edit Modal for pending ideas */}
+      {selectedPendingIdea && (
+        <IdeaEditModal
+          pendingIdea={selectedPendingIdea}
+          onClose={() => setSelectedPendingIdea(null)}
+          onUpdate={(idea, settings) => {
+            updatePendingIdea(selectedPendingIdea.id, idea, settings);
+            // Update local state to reflect changes
+            setSelectedPendingIdea((prev) =>
+              prev ? { ...prev, idea, settings } : null
+            );
+          }}
+          onGenerate={(idea, settings, assets) => {
+            startGenerationFromPending(selectedPendingIdea.id, idea, settings, assets);
+            setSelectedPendingIdea(null);
+          }}
+          onAssetGenerated={(asset) => {
+            addAssetToPendingIdea(selectedPendingIdea.id, asset);
+            // Update local state
+            setSelectedPendingIdea((prev) =>
+              prev ? { ...prev, assets: [asset, ...prev.assets] } : null
+            );
+          }}
+          onAssetDeleted={(assetId) => {
+            removeAssetFromPendingIdea(selectedPendingIdea.id, assetId);
+            // Update local state
+            setSelectedPendingIdea((prev) =>
+              prev ? { ...prev, assets: prev.assets.filter((a) => a.id !== assetId) } : null
+            );
+          }}
         />
       )}
     </div>

@@ -38,7 +38,7 @@ function compileComponent(sourceCode: string): React.FC | null {
     // Create a function that returns the component
     // We inject React and Remotion dependencies
     const wrappedCode = `
-      const { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Sequence, Easing } = Remotion;
+      const { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Sequence, Easing, Img, Audio, Video, staticFile, delayRender, continueRender } = Remotion;
 
       ${transformed.code}
 

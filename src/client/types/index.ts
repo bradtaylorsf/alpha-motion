@@ -9,6 +9,22 @@ export interface AnimationIdea {
   suggestedAssets: string[];
 }
 
+export interface GenerationSettings {
+  durationFrames: number;
+  fps: number;
+  width: number;
+  height: number;
+}
+
+export interface PendingIdea {
+  id: string;
+  idea: AnimationIdea;
+  settings: GenerationSettings;
+  assets: Asset[];
+  createdAt: string | number; // string from API, number from local state
+  updatedAt?: string;
+}
+
 export interface Component {
   id: string;
   name: string;
@@ -32,8 +48,21 @@ export interface GenerationJob {
   component?: Component;
 }
 
-// A board item can be either a completed component or a generation in progress
+// A board item can be a pending idea, generating, completed, or failed
 export type BoardItem =
+  | { type: 'pending'; data: PendingIdea }
   | { type: 'component'; data: Component }
   | { type: 'generating'; id: string; idea: AnimationIdea; status: 'queued' | 'generating'; startedAt: number }
   | { type: 'failed'; id: string; idea: AnimationIdea; error: string; startedAt: number }
+
+export interface Asset {
+  id: string;
+  componentId: string | null;
+  name: string;
+  type: 'generated' | 'uploaded';
+  source: 'nano-bananas' | 'local';
+  filePath: string;
+  promptUsed: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}

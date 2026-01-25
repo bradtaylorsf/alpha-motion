@@ -54,6 +54,15 @@ db.exec(`
     position INTEGER,
     PRIMARY KEY (collection_id, component_id)
   );
+
+  CREATE TABLE IF NOT EXISTS pending_ideas (
+    id TEXT PRIMARY KEY,
+    idea_json TEXT NOT NULL,
+    settings_json TEXT NOT NULL,
+    asset_ids TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 console.log('Database migrated successfully!');

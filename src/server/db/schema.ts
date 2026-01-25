@@ -28,6 +28,15 @@ export const assets = sqliteTable('assets', {
   createdAt: text('created_at').default('CURRENT_TIMESTAMP'),
 });
 
+export const pendingIdeas = sqliteTable('pending_ideas', {
+  id: text('id').primaryKey(),
+  ideaJson: text('idea_json').notNull(), // JSON of AnimationIdea
+  settingsJson: text('settings_json').notNull(), // JSON of GenerationSettings
+  assetIds: text('asset_ids'), // JSON array of asset IDs
+  createdAt: text('created_at').default('CURRENT_TIMESTAMP'),
+  updatedAt: text('updated_at').default('CURRENT_TIMESTAMP'),
+});
+
 export const collections = sqliteTable('collections', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -49,5 +58,7 @@ export type Component = typeof components.$inferSelect;
 export type NewComponent = typeof components.$inferInsert;
 export type Asset = typeof assets.$inferSelect;
 export type NewAsset = typeof assets.$inferInsert;
+export type PendingIdea = typeof pendingIdeas.$inferSelect;
+export type NewPendingIdea = typeof pendingIdeas.$inferInsert;
 export type Collection = typeof collections.$inferSelect;
 export type NewCollection = typeof collections.$inferInsert;

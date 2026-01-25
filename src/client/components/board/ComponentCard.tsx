@@ -5,10 +5,11 @@ interface ComponentCardProps {
   component: Component;
   onClick?: () => void;
   onDelete?: () => void;
+  onRemix?: () => void;
   className?: string;
 }
 
-export function ComponentCard({ component, onClick, onDelete, className }: ComponentCardProps) {
+export function ComponentCard({ component, onClick, onDelete, onRemix, className }: ComponentCardProps) {
   const colors = component.ideaJson?.colors || [];
 
   return (
@@ -70,20 +71,37 @@ export function ComponentCard({ component, onClick, onDelete, className }: Compo
         )}
       </div>
 
-      {/* Delete button */}
-      {onDelete && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="absolute top-2 right-2 rounded-full bg-background/80 p-1.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-destructive hover:text-destructive-foreground"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      )}
+      {/* Action buttons */}
+      <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        {onRemix && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemix();
+            }}
+            className="rounded-full bg-background/80 p-1.5 hover:bg-primary hover:text-primary-foreground"
+            title="Remix this component"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="rounded-full bg-background/80 p-1.5 hover:bg-destructive hover:text-destructive-foreground"
+            title="Delete component"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
     </div>
   );
 }
