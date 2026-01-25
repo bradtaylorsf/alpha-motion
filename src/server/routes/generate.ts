@@ -1,0 +1,84 @@
+import { Router } from 'express';
+import { startGeneration, getJobStatus } from '../services/claude-code';
+import { createComponent } from '../services/component-store';
+import type { AnimationIdea } from '../services/anthropic';
+
+const router = Router();
+
+router.post('/', async (req, res) => {
+  try {
+    const { idea, options } = req.body;
+    console.log('POST /api/generate - Received request:', idea?.title);
+
+    if (!idea || !idea.title || !idea.description) {
+      return res.status(400).json({ error: 'Valid idea object is required' });
+    }
+
+    const jobId = startGeneration(idea as AnimationIdea);
+    console.log(`POST /api/generate - Started job: ${jobId}`);
+
+    res.json({
+      jobId,
+      status: 'queued',
+    });
+  } catch (error) {
+    console.error('Error starting generation:', error);
+    res.status(500).json({
+      error: 'Failed to start generation',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+router.get('/:jobId/status', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const job = getJobStatus(jobId);
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const response: {
+      jobId: string;
+      status: string;
+      error?: string;
+      component?: object;
+    } = {
+      jobId: job.id,
+      status: job.status,
+    };
+
+    if (job.status === 'failed') {
+      response.error = job.error;
+    }
+
+    if (job.status === 'complete' && job.result) {
+      // Save the component to database
+      const component = await createComponent({
+        name: job.idea.title,
+        description: job.idea.description,
+        promptUsed: `${job.idea.title}: ${job.idea.description}`,
+        idea: job.idea,
+        sourceCode: job.result,
+        tags: [
+          job.idea.style,
+          job.idea.motion,
+          ...job.idea.elements.slice(0, 3),
+        ].filter(Boolean),
+      });
+
+      response.component = component;
+    }
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error getting job status:', error);
+    res.status(500).json({
+      error: 'Failed to get job status',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+export default router;
