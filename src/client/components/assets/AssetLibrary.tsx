@@ -9,6 +9,9 @@ interface AssetLibraryProps {
   onDelete?: (id: string) => void;
   onSelect?: (asset: Asset) => void;
   onRemix?: (asset: Asset) => void;
+  onEdit?: (asset: Asset) => void;
+  onRemoveBackground?: (asset: Asset) => void;
+  onFullPreview?: (asset: Asset) => void;
   emptyMessage?: string;
   className?: string;
   columns?: 2 | 3 | 4;
@@ -21,6 +24,9 @@ export function AssetLibrary({
   onDelete,
   onSelect,
   onRemix,
+  onEdit,
+  onRemoveBackground,
+  onFullPreview,
   emptyMessage = 'No assets generated yet',
   className,
   columns = 3,
@@ -94,6 +100,9 @@ export function AssetLibrary({
             onClick={onSelect ? () => onSelect(asset) : undefined}
             onDelete={onDelete ? () => onDelete(asset.id) : undefined}
             onRemix={onRemix ? () => onRemix(asset) : undefined}
+            onEdit={onEdit ? () => onEdit(asset) : undefined}
+            onRemoveBackground={onRemoveBackground ? () => onRemoveBackground(asset) : undefined}
+            onFullPreview={onFullPreview ? () => onFullPreview(asset) : undefined}
             showDetails
           />
         ))}

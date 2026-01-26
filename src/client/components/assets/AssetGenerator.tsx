@@ -6,6 +6,7 @@ export type AssetType = 'background' | 'icon' | 'texture' | 'character' | 'objec
 export interface GenerateOptions {
   aspectRatio?: '16:9' | '9:16' | '1:1' | '4:3' | '3:4';
   type?: AssetType;
+  transparent?: boolean;
 }
 
 interface AssetGeneratorProps {
@@ -66,6 +67,7 @@ export function AssetGenerator({
   const [customPrompt, setCustomPrompt] = useState('');
   const [selectedType, setSelectedType] = useState<AssetType>('object');
   const [selectedSuggestions, setSelectedSuggestions] = useState<Set<string>>(new Set());
+  const [transparentBackground, setTransparentBackground] = useState(false);
 
   // Set initial prompt when provided (for remix functionality)
   useEffect(() => {
@@ -84,6 +86,7 @@ export function AssetGenerator({
     const options: GenerateOptions = {
       type: selectedType,
       aspectRatio: getAspectForType(selectedType),
+      transparent: transparentBackground,
     };
     await onGenerate(enhancedPrompt, options);
     setCustomPrompt('');
@@ -162,6 +165,34 @@ export function AssetGenerator({
               <span className="ml-1 opacity-60">({type.aspect})</span>
             </button>
           ))}
+        </div>
+
+        {/* Transparent background toggle */}
+        <div className="flex items-center gap-2 mb-2">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={transparentBackground}
+            onClick={() => setTransparentBackground(!transparentBackground)}
+            disabled={generating}
+            className={cn(
+              'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed',
+              transparentBackground ? 'bg-primary' : 'bg-muted'
+            )}
+          >
+            <span
+              className={cn(
+                'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow ring-0 transition-transform',
+                transparentBackground ? 'translate-x-4' : 'translate-x-0'
+              )}
+            />
+          </button>
+          <label className="text-sm text-foreground cursor-pointer" onClick={() => !generating && setTransparentBackground(!transparentBackground)}>
+            Transparent Background
+          </label>
+          <span className="text-xs text-muted-foreground" title="Uses 3 API calls: generates with white background, edits to black, then extracts transparency">
+            (slower, 3 API calls)
+          </span>
         </div>
 
         <div className="flex gap-2">

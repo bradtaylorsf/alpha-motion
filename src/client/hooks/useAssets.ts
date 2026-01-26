@@ -7,7 +7,11 @@ import {
   updateAsset as apiUpdateAsset,
   deleteAsset as apiDeleteAsset,
   linkAssetToComponent as apiLinkAssetToComponent,
+  editAsset as apiEditAsset,
+  removeAssetBackground as apiRemoveAssetBackground,
   type GenerateAssetOptions,
+  type EditAssetOptions,
+  type RemoveBackgroundOptions,
 } from '../lib/api';
 import type { Asset } from '../types';
 
@@ -15,6 +19,8 @@ export function useAssets(componentId?: string) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [removingBackground, setRemovingBackground] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchAssets = useCallback(async (filterComponentId?: string) => {
@@ -121,6 +127,42 @@ export function useAssets(componentId?: string) {
     }
   }, []);
 
+  const editAsset = useCallback(
+    async (id: string, options: EditAssetOptions) => {
+      setEditing(true);
+      setError(null);
+      try {
+        const editedAsset = await apiEditAsset(id, options);
+        setAssets((prev) => [editedAsset, ...prev]);
+        return editedAsset;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to edit asset');
+        return null;
+      } finally {
+        setEditing(false);
+      }
+    },
+    []
+  );
+
+  const removeBackground = useCallback(
+    async (id: string, options?: RemoveBackgroundOptions) => {
+      setRemovingBackground(true);
+      setError(null);
+      try {
+        const transparentAsset = await apiRemoveAssetBackground(id, options);
+        setAssets((prev) => [transparentAsset, ...prev]);
+        return transparentAsset;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to remove background');
+        return null;
+      } finally {
+        setRemovingBackground(false);
+      }
+    },
+    []
+  );
+
   const addAsset = useCallback((asset: Asset) => {
     setAssets((prev) => [asset, ...prev]);
   }, []);
@@ -134,6 +176,8 @@ export function useAssets(componentId?: string) {
     assets,
     loading,
     generating,
+    editing,
+    removingBackground,
     error,
     fetchAssets,
     fetchAsset,
@@ -142,6 +186,8 @@ export function useAssets(componentId?: string) {
     updateAsset,
     linkToComponent,
     deleteAsset,
+    editAsset,
+    removeBackground,
     addAsset,
   };
 }

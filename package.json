@@ -53,6 +53,7 @@
     "react-resizable-panels": "^4.5.2",
     "react-router-dom": "^7.13.0",
     "remotion": "4.0.409",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^2.6.0",
     "three": "^0.170.0",
     "uuid": "^11.0.0",

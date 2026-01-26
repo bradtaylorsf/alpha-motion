@@ -6,6 +6,9 @@ interface AssetPreviewProps {
   onDelete?: () => void;
   onClick?: () => void;
   onRemix?: () => void;
+  onEdit?: () => void;
+  onRemoveBackground?: () => void;
+  onFullPreview?: () => void;
   className?: string;
   showDetails?: boolean;
 }
@@ -15,6 +18,9 @@ export function AssetPreview({
   onDelete,
   onClick,
   onRemix,
+  onEdit,
+  onRemoveBackground,
+  onFullPreview,
   className,
   showDetails = false,
 }: AssetPreviewProps) {
@@ -63,6 +69,51 @@ export function AssetPreview({
 
       {/* Action buttons */}
       <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        {onFullPreview && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onFullPreview();
+            }}
+            className="rounded-full bg-background/80 p-1.5 hover:bg-primary hover:text-primary-foreground backdrop-blur-sm"
+            aria-label="View full size"
+            title="View full size"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+            </svg>
+          </button>
+        )}
+        {onEdit && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="rounded-full bg-background/80 p-1.5 hover:bg-primary hover:text-primary-foreground backdrop-blur-sm"
+            aria-label="Edit image"
+            title="Edit with AI"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </button>
+        )}
+        {onRemoveBackground && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemoveBackground();
+            }}
+            className="rounded-full bg-background/80 p-1.5 hover:bg-primary hover:text-primary-foreground backdrop-blur-sm"
+            aria-label="Remove background"
+            title="Remove background"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </button>
+        )}
         {onRemix && (
           <button
             onClick={(e) => {

@@ -100,6 +100,7 @@ export interface GenerateAssetOptions {
   aspectRatio?: '16:9' | '9:16' | '1:1' | '4:3' | '3:4';
   componentId?: string;
   name?: string;
+  transparent?: boolean;
 }
 
 export interface BatchGenerateResult {
@@ -172,6 +173,39 @@ export async function deleteAsset(id: string): Promise<void> {
   await fetchJson<{ success: boolean }>(`${API_BASE}/assets/${id}`, {
     method: 'DELETE',
   });
+}
+
+export interface EditAssetOptions {
+  editPrompt: string;
+  model?: string;
+  aspectRatio?: '16:9' | '9:16' | '1:1' | '4:3' | '3:4';
+}
+
+export async function editAsset(
+  assetId: string,
+  options: EditAssetOptions
+): Promise<Asset> {
+  const result = await fetchJson<{ asset: Asset }>(`${API_BASE}/assets/${assetId}/edit`, {
+    method: 'POST',
+    body: JSON.stringify(options),
+  });
+  return result.asset;
+}
+
+export interface RemoveBackgroundOptions {
+  model?: string;
+  aspectRatio?: '16:9' | '9:16' | '1:1' | '4:3' | '3:4';
+}
+
+export async function removeAssetBackground(
+  assetId: string,
+  options?: RemoveBackgroundOptions
+): Promise<Asset> {
+  const result = await fetchJson<{ asset: Asset }>(`${API_BASE}/assets/${assetId}/remove-background`, {
+    method: 'POST',
+    body: JSON.stringify(options || {}),
+  });
+  return result.asset;
 }
 
 // Pending Ideas API

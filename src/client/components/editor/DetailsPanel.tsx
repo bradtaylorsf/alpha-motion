@@ -10,9 +10,13 @@ interface DetailsPanelProps {
   assets: Asset[];
   assetsLoading: boolean;
   onSettingsChange: (settings: Partial<Pick<Component, 'durationFrames' | 'fps' | 'width' | 'height'>>) => void;
-  onGenerateAsset: (prompt: string) => void;
+  onGenerateAsset: (prompt: string, options?: { transparent?: boolean }) => void;
   onDeleteAsset: (id: string) => void;
+  onEditAsset?: (id: string, editPrompt: string) => Promise<Asset | null>;
+  onRemoveBackground?: (id: string) => void;
   assetsGenerating: boolean;
+  assetsEditing?: boolean;
+  removingBackground?: boolean;
 }
 
 type TabType = 'settings' | 'assets' | 'export';
@@ -24,7 +28,11 @@ export function DetailsPanel({
   onSettingsChange,
   onGenerateAsset,
   onDeleteAsset,
+  onEditAsset,
+  onRemoveBackground,
   assetsGenerating,
+  assetsEditing,
+  removingBackground,
 }: DetailsPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('settings');
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -95,9 +103,13 @@ export function DetailsPanel({
               assets={assets}
               loading={assetsLoading}
               generating={assetsGenerating}
+              editing={assetsEditing}
+              removingBackground={removingBackground}
               suggestedAssets={component.ideaJson?.suggestedAssets || []}
               onGenerate={onGenerateAsset}
               onDelete={onDeleteAsset}
+              onEdit={onEditAsset}
+              onRemoveBackground={onRemoveBackground}
             />
           )}
           {activeTab === 'export' && (

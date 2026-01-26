@@ -3,11 +3,13 @@ import { RemotionPreview } from './RemotionPreview';
 import { CodeViewer } from './CodeViewer';
 import { ExportModal } from './ExportModal';
 import { getComponentSource } from '../../lib/api';
-import type { Component } from '../../types';
+import type { Component, Asset } from '../../types';
 import { cn, parseTags } from '../../lib/utils';
 import { useAssets } from '../../hooks/useAssets';
 import { AssetGenerator } from '../assets/AssetGenerator';
 import { AssetLibrary } from '../assets/AssetLibrary';
+import { AssetEditModal } from '../assets/AssetEditModal';
+import { AssetFullPreviewModal } from '../assets/AssetFullPreviewModal';
 
 interface PreviewModalProps {
   component: Component;
@@ -26,11 +28,21 @@ export function PreviewModal({ component, onClose, onRemix }: PreviewModalProps)
     assets,
     loading: assetsLoading,
     generating: assetsGenerating,
+    editing: assetsEditing,
+    removingBackground,
     error: assetsError,
     generateAsset,
     generateFromSuggestions,
     deleteAsset,
+    editAsset,
+    removeBackground,
   } = useAssets(component.id);
+
+  // Edit modal state
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+
+  // Full preview modal state
+  const [previewingAsset, setPreviewingAsset] = useState<Asset | null>(null);
 
   // Get suggested assets from the idea
   const suggestedAssets = component.ideaJson?.suggestedAssets || [];
@@ -167,8 +179,12 @@ export function PreviewModal({ component, onClose, onRemix }: PreviewModalProps)
               {/* Asset Generator */}
               <AssetGenerator
                 suggestedAssets={suggestedAssets}
-                generating={assetsGenerating}
-                onGenerate={(prompt) => generateAsset(prompt, { componentId: component.id })}
+                generating={assetsGenerating || removingBackground}
+                onGenerate={(prompt, options) => generateAsset(prompt, {
+                  componentId: component.id,
+                  aspectRatio: options?.aspectRatio,
+                  transparent: options?.transparent,
+                })}
                 onGenerateBatch={(prompts) => generateFromSuggestions(prompts, { componentId: component.id })}
                 componentId={component.id}
               />
@@ -184,6 +200,16 @@ export function PreviewModal({ component, onClose, onRemix }: PreviewModalProps)
                 loading={assetsLoading}
                 error={assetsError}
                 onDelete={deleteAsset}
+                onEdit={(asset) => setEditingAsset(asset)}
+                onRemoveBackground={(asset) => {
+                  // Check if already transparent
+                  const metadata = asset.metadata as Record<string, unknown> | null;
+                  if (metadata?.transparent) {
+                    return; // Already transparent
+                  }
+                  removeBackground(asset.id);
+                }}
+                onFullPreview={(asset) => setPreviewingAsset(asset)}
                 emptyMessage="No assets generated yet. Use the suggestions above or enter a custom prompt."
                 columns={3}
               />
@@ -250,6 +276,25 @@ export function PreviewModal({ component, onClose, onRemix }: PreviewModalProps)
           componentId={component.id}
           componentName={component.name}
           onClose={() => setShowExportModal(false)}
+        />
+      )}
+
+      {/* Asset Edit Modal */}
+      {editingAsset && (
+        <AssetEditModal
+          asset={editingAsset}
+          open={!!editingAsset}
+          onOpenChange={(open) => !open && setEditingAsset(null)}
+          onEdit={(editPrompt) => editAsset(editingAsset.id, { editPrompt })}
+          editing={assetsEditing}
+        />
+      )}
+
+      {/* Asset Full Preview Modal */}
+      {previewingAsset && (
+        <AssetFullPreviewModal
+          asset={previewingAsset}
+          onClose={() => setPreviewingAsset(null)}
         />
       )}
     </div>

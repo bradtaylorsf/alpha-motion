@@ -32,8 +32,12 @@ export function ComponentEditor() {
     assets,
     loading: assetsLoading,
     generating: assetsGenerating,
+    editing: assetsEditing,
+    removingBackground,
     generateAsset,
     deleteAsset,
+    editAsset,
+    removeBackground,
   } = useAssets(id);
 
   // Load component
@@ -111,15 +115,23 @@ export function ComponentEditor() {
   }, [id, component]);
 
   // Asset handlers
-  const handleGenerateAsset = useCallback((prompt: string) => {
+  const handleGenerateAsset = useCallback((prompt: string, options?: { transparent?: boolean }) => {
     if (id) {
-      generateAsset(prompt, { componentId: id });
+      generateAsset(prompt, { componentId: id, transparent: options?.transparent });
     }
   }, [id, generateAsset]);
 
   const handleDeleteAsset = useCallback((assetId: string) => {
     deleteAsset(assetId);
   }, [deleteAsset]);
+
+  const handleEditAsset = useCallback(async (assetId: string, editPrompt: string) => {
+    return editAsset(assetId, { editPrompt });
+  }, [editAsset]);
+
+  const handleRemoveBackground = useCallback((assetId: string) => {
+    removeBackground(assetId);
+  }, [removeBackground]);
 
   if (loading) {
     return (
@@ -223,9 +235,13 @@ export function ComponentEditor() {
                 assets={assets}
                 assetsLoading={assetsLoading}
                 assetsGenerating={assetsGenerating}
+                assetsEditing={assetsEditing}
+                removingBackground={removingBackground}
                 onSettingsChange={handleSettingsChange}
                 onGenerateAsset={handleGenerateAsset}
                 onDeleteAsset={handleDeleteAsset}
+                onEditAsset={handleEditAsset}
+                onRemoveBackground={handleRemoveBackground}
               />
             </div>
           </Panel>

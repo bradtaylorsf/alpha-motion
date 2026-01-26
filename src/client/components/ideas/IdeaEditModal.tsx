@@ -3,6 +3,8 @@ import type { PendingIdea, AnimationIdea, GenerationSettings, Asset } from '../.
 import { useAssets } from '../../hooks/useAssets';
 import { AssetGenerator, type GenerateOptions } from '../assets/AssetGenerator';
 import { AssetLibrary } from '../assets/AssetLibrary';
+import { AssetEditModal } from '../assets/AssetEditModal';
+import { AssetFullPreviewModal } from '../assets/AssetFullPreviewModal';
 
 interface IdeaEditModalProps {
   pendingIdea: PendingIdea;
@@ -31,10 +33,20 @@ export function IdeaEditModal({
   // Assets hook - we'll manage assets locally but sync with parent
   const {
     generating: assetsGenerating,
+    editing: assetsEditing,
+    removingBackground,
     generateAsset,
     generateFromSuggestions,
     deleteAsset,
+    editAsset,
+    removeBackground,
   } = useAssets();
+
+  // Edit modal state
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+
+  // Full preview modal state
+  const [previewingAsset, setPreviewingAsset] = useState<Asset | null>(null);
 
   // Local assets state (synced from pendingIdea)
   const [localAssets, setLocalAssets] = useState<Asset[]>(pendingIdea.assets);
@@ -56,6 +68,7 @@ export function IdeaEditModal({
   const handleGenerateAsset = async (prompt: string, options?: GenerateOptions) => {
     const asset = await generateAsset(prompt, {
       aspectRatio: options?.aspectRatio,
+      transparent: options?.transparent,
     });
     if (asset) {
       setLocalAssets((prev) => [asset, ...prev]);
@@ -89,6 +102,27 @@ export function IdeaEditModal({
     if (success) {
       setLocalAssets((prev) => prev.filter((a) => a.id !== assetId));
       onAssetDeleted(assetId);
+    }
+  };
+
+  const handleEditAsset = async (assetId: string, editPrompt: string) => {
+    const editedAsset = await editAsset(assetId, { editPrompt });
+    if (editedAsset) {
+      setLocalAssets((prev) => [editedAsset, ...prev]);
+      onAssetGenerated(editedAsset);
+    }
+    return editedAsset;
+  };
+
+  const handleRemoveBackground = async (asset: Asset) => {
+    const metadata = asset.metadata as Record<string, unknown> | null;
+    if (metadata?.transparent) {
+      return; // Already transparent
+    }
+    const transparentAsset = await removeBackground(asset.id);
+    if (transparentAsset) {
+      setLocalAssets((prev) => [transparentAsset, ...prev]);
+      onAssetGenerated(transparentAsset);
     }
   };
 
@@ -378,6 +412,9 @@ export function IdeaEditModal({
                   error={null}
                   onDelete={handleDeleteAsset}
                   onRemix={handleRemixAsset}
+                  onEdit={(asset) => setEditingAsset(asset)}
+                  onRemoveBackground={handleRemoveBackground}
+                  onFullPreview={(asset) => setPreviewingAsset(asset)}
                   emptyMessage=""
                   columns={4}
                 />
@@ -415,6 +452,25 @@ export function IdeaEditModal({
           </div>
         </div>
       </div>
+
+      {/* Asset Edit Modal */}
+      {editingAsset && (
+        <AssetEditModal
+          asset={editingAsset}
+          open={!!editingAsset}
+          onOpenChange={(open) => !open && setEditingAsset(null)}
+          onEdit={(editPrompt) => handleEditAsset(editingAsset.id, editPrompt)}
+          editing={assetsEditing}
+        />
+      )}
+
+      {/* Asset Full Preview Modal */}
+      {previewingAsset && (
+        <AssetFullPreviewModal
+          asset={previewingAsset}
+          onClose={() => setPreviewingAsset(null)}
+        />
+      )}
     </div>
   );
 }

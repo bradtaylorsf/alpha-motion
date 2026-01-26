@@ -1,5 +1,12 @@
 import { Router } from 'express';
-import { generateImage, type GenerateImageOptions } from '../services/nano-bananas';
+import {
+  generateImage,
+  editImage,
+  generateTransparentImage,
+  removeBackground,
+  type GenerateImageOptions,
+  type EditImageOptions,
+} from '../services/nano-bananas';
 import {
   createAsset,
   getAsset,
@@ -25,20 +32,30 @@ function parseAsset(asset: ReturnType<typeof getAsset> extends Promise<infer T> 
 // Generate a single image
 router.post('/generate', async (req, res) => {
   try {
-    const { prompt, model, aspectRatio, componentId, name } = req.body;
+    const { prompt, model, aspectRatio, componentId, name, transparent } = req.body;
 
     if (!prompt || typeof prompt !== 'string') {
       return res.status(400).json({ error: 'prompt is required' });
     }
 
-    const options: GenerateImageOptions = {
-      prompt,
-      model,
-      aspectRatio,
-    };
+    let result;
 
-    // Generate the image
-    const result = await generateImage(options);
+    if (transparent) {
+      // Use transparent image generation (3 API calls)
+      result = await generateTransparentImage({
+        prompt,
+        model,
+        aspectRatio,
+      });
+    } else {
+      // Standard image generation
+      const options: GenerateImageOptions = {
+        prompt,
+        model,
+        aspectRatio,
+      };
+      result = await generateImage(options);
+    }
 
     // Store in database
     const asset = await createAsset({
@@ -51,6 +68,7 @@ router.post('/generate', async (req, res) => {
       metadata: {
         model: model || 'gemini-2.0-flash-exp-image-generation',
         aspectRatio: aspectRatio || '16:9',
+        transparent: transparent || false,
       },
     });
 
@@ -212,6 +230,117 @@ router.put('/:id/link', async (req, res) => {
     console.error('Error linking asset:', error);
     res.status(500).json({
       error: 'Failed to link asset',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Edit an existing image using AI
+router.post('/:id/edit', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { editPrompt, model, aspectRatio } = req.body;
+
+    if (!editPrompt || typeof editPrompt !== 'string') {
+      return res.status(400).json({ error: 'editPrompt is required' });
+    }
+
+    // Fetch original asset
+    const originalAsset = await getAsset(id);
+    if (!originalAsset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    const editOptions: EditImageOptions = {
+      sourceImagePath: originalAsset.filePath,
+      editPrompt,
+      model,
+      aspectRatio,
+    };
+
+    // Edit the image
+    const result = await editImage(editOptions);
+
+    // Parse original metadata
+    const originalMetadata = originalAsset.metadata ? JSON.parse(originalAsset.metadata) : {};
+
+    // Store as NEW asset with editedFrom metadata
+    const newAsset = await createAsset({
+      name: `Edited: ${originalAsset.name}`.slice(0, 50),
+      componentId: originalAsset.componentId ?? undefined,
+      type: 'generated',
+      source: 'nano-bananas',
+      filePath: result.filePath,
+      promptUsed: editPrompt,
+      metadata: {
+        model: model || 'gemini-2.0-flash-exp-image-generation',
+        aspectRatio: aspectRatio || originalMetadata.aspectRatio || '16:9',
+        editedFrom: id,
+        originalPrompt: originalAsset.promptUsed,
+      },
+    });
+
+    res.json({ asset: parseAsset(newAsset) });
+  } catch (error) {
+    console.error('Error editing image:', error);
+    res.status(500).json({
+      error: 'Failed to edit image',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Remove background from an existing image
+router.post('/:id/remove-background', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { model, aspectRatio } = req.body;
+
+    // Fetch original asset
+    const originalAsset = await getAsset(id);
+    if (!originalAsset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    // Parse original metadata
+    const originalMetadata = originalAsset.metadata ? JSON.parse(originalAsset.metadata) : {};
+
+    // Check if already transparent
+    if (originalMetadata.transparent) {
+      return res.status(400).json({ error: 'Asset already has transparent background' });
+    }
+
+    // Remove the background
+    const result = await removeBackground(
+      originalAsset.filePath,
+      originalAsset.promptUsed || 'Unknown',
+      {
+        model,
+        aspectRatio: aspectRatio || originalMetadata.aspectRatio,
+      }
+    );
+
+    // Store as NEW asset with backgroundRemoved metadata
+    const newAsset = await createAsset({
+      name: `${originalAsset.name} (transparent)`.slice(0, 50),
+      componentId: originalAsset.componentId ?? undefined,
+      type: 'generated',
+      source: 'nano-bananas',
+      filePath: result.filePath,
+      promptUsed: originalAsset.promptUsed ?? undefined,
+      metadata: {
+        model: model || originalMetadata.model || 'gemini-2.0-flash-exp-image-generation',
+        aspectRatio: aspectRatio || originalMetadata.aspectRatio || '16:9',
+        transparent: true,
+        backgroundRemovedFrom: id,
+      },
+    });
+
+    res.json({ asset: parseAsset(newAsset) });
+  } catch (error) {
+    console.error('Error removing background:', error);
+    res.status(500).json({
+      error: 'Failed to remove background',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }
