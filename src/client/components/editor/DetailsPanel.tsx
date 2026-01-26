@@ -2,29 +2,43 @@ import { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { SettingsTab } from './SettingsTab';
 import { ExportTab } from './ExportTab';
-import type { Component } from '../../types';
+import { EditTab } from './EditTab';
+import type { Component, Asset } from '../../types';
 
 interface DetailsPanelProps {
   component: Component;
+  assets: Asset[];
   onSettingsChange: (settings: Partial<Pick<Component, 'durationFrames' | 'fps' | 'width' | 'height'>>) => void;
+  onEdit: (instructions: string) => void;
+  onRemix: (instructions: string) => void;
+  isEditing: boolean;
+  isRemixing: boolean;
+  editError: string | null;
 }
 
-type TabType = 'settings' | 'export';
+type TabType = 'edit' | 'settings' | 'export';
 
 export function DetailsPanel({
   component,
+  assets,
   onSettingsChange,
+  onEdit,
+  onRemix,
+  isEditing,
+  isRemixing,
+  editError,
 }: DetailsPanelProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('settings');
+  const [activeTab, setActiveTab] = useState<TabType>('edit');
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   const tabs: { id: TabType; label: string }[] = [
+    { id: 'edit', label: 'Edit' },
     { id: 'settings', label: 'Settings' },
     { id: 'export', label: 'Export' },
   ];
 
   return (
-    <div className={cn('border-t border-border bg-card flex flex-col', isCollapsed ? 'h-10' : 'h-48')}>
+    <div className={cn('border-t border-border bg-card flex flex-col', isCollapsed ? 'h-10' : 'h-64')}>
       {/* Tab header */}
       <div className="flex items-center justify-between border-b border-border px-2 shrink-0">
         <div className="flex">
@@ -64,6 +78,17 @@ export function DetailsPanel({
       {/* Tab content */}
       {!isCollapsed && (
         <div className="flex-1 overflow-auto p-4">
+          {activeTab === 'edit' && (
+            <EditTab
+              componentId={component.id}
+              assets={assets}
+              isEditing={isEditing}
+              isRemixing={isRemixing}
+              error={editError}
+              onEdit={onEdit}
+              onRemix={onRemix}
+            />
+          )}
           {activeTab === 'settings' && (
             <SettingsTab
               durationFrames={component.durationFrames}

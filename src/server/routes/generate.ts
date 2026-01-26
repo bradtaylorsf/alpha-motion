@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { startGeneration, getJobStatus } from '../services/claude-code';
-import { createComponent } from '../services/component-store';
-import { linkAssetToComponent } from '../services/asset-store';
+import { startGeneration, getJobStatus, startEditGeneration, getEditJobStatus } from '../services/claude-code';
+import { createComponent, getComponent, updateComponent } from '../services/component-store';
+import { linkAssetToComponent, getAssetsByComponent } from '../services/asset-store';
 import type { AnimationIdea } from '../services/anthropic';
 
 const router = Router();
@@ -107,6 +107,188 @@ router.get('/:jobId/status', async (req, res) => {
     console.error('Error getting job status:', error);
     res.status(500).json({
       error: 'Failed to get job status',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Edit an existing component
+router.post('/edit', async (req, res) => {
+  try {
+    const { componentId, instructions } = req.body as { componentId: string; instructions: string };
+    console.log(`POST /api/generate/edit - Component: ${componentId}`);
+
+    if (!componentId || !instructions) {
+      return res.status(400).json({ error: 'componentId and instructions are required' });
+    }
+
+    // Get the current component
+    const component = await getComponent(componentId);
+    if (!component) {
+      return res.status(404).json({ error: 'Component not found' });
+    }
+
+    if (!component.sourceCode) {
+      return res.status(400).json({ error: 'Component has no source code to edit' });
+    }
+
+    // Get linked assets
+    const assets = await getAssetsByComponent(componentId);
+    const assetInfos = assets
+      .filter(a => a.filePath)
+      .map(a => ({
+        id: a.id,
+        url: `/uploads/${a.filePath!.split('/').pop()}`,
+        prompt: a.promptUsed || a.name,
+        type: undefined,
+      }));
+
+    const jobId = startEditGeneration(
+      componentId,
+      component.sourceCode,
+      instructions,
+      'edit',
+      assetInfos
+    );
+    console.log(`POST /api/generate/edit - Started job: ${jobId}`);
+
+    res.json({
+      jobId,
+      status: 'queued',
+    });
+  } catch (error) {
+    console.error('Error starting edit generation:', error);
+    res.status(500).json({
+      error: 'Failed to start edit generation',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Remix (create new component based on existing one)
+router.post('/remix', async (req, res) => {
+  try {
+    const { componentId, instructions } = req.body as { componentId: string; instructions: string };
+    console.log(`POST /api/generate/remix - Component: ${componentId}`);
+
+    if (!componentId || !instructions) {
+      return res.status(400).json({ error: 'componentId and instructions are required' });
+    }
+
+    // Get the current component
+    const component = await getComponent(componentId);
+    if (!component) {
+      return res.status(404).json({ error: 'Component not found' });
+    }
+
+    if (!component.sourceCode) {
+      return res.status(400).json({ error: 'Component has no source code to remix' });
+    }
+
+    // Get linked assets
+    const assets = await getAssetsByComponent(componentId);
+    const assetInfos = assets
+      .filter(a => a.filePath)
+      .map(a => ({
+        id: a.id,
+        url: `/uploads/${a.filePath!.split('/').pop()}`,
+        prompt: a.promptUsed || a.name,
+        type: undefined,
+      }));
+
+    const jobId = startEditGeneration(
+      componentId,
+      component.sourceCode,
+      instructions,
+      'remix',
+      assetInfos
+    );
+    console.log(`POST /api/generate/remix - Started job: ${jobId}`);
+
+    res.json({
+      jobId,
+      status: 'queued',
+    });
+  } catch (error) {
+    console.error('Error starting remix generation:', error);
+    res.status(500).json({
+      error: 'Failed to start remix generation',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Get edit/remix job status
+router.get('/edit/:jobId/status', async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const job = getEditJobStatus(jobId);
+
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const response: {
+      jobId: string;
+      status: string;
+      type: 'edit' | 'remix';
+      error?: string;
+      component?: object;
+    } = {
+      jobId: job.id,
+      status: job.status,
+      type: job.type,
+    };
+
+    if (job.status === 'failed') {
+      response.error = job.error;
+    }
+
+    if (job.status === 'complete' && job.result) {
+      if (job.type === 'edit') {
+        // Update existing component
+        const updated = await updateComponent(job.componentId, {
+          sourceCode: job.result,
+        });
+        if (updated) {
+          // Parse JSON fields
+          response.component = {
+            ...updated,
+            tags: updated.tags ? JSON.parse(updated.tags) : [],
+            ideaJson: updated.ideaJson ? JSON.parse(updated.ideaJson) : null,
+          };
+        }
+      } else {
+        // Create new component as remix
+        const original = await getComponent(job.componentId);
+        if (original) {
+          const newComponent = await createComponent({
+            name: `${original.name} (Remix)`,
+            description: original.description || undefined,
+            promptUsed: `Remix: ${job.instructions}`,
+            idea: original.ideaJson ? JSON.parse(original.ideaJson) : undefined,
+            sourceCode: job.result,
+            tags: original.tags ? JSON.parse(original.tags) : undefined,
+            durationFrames: original.durationFrames ?? undefined,
+            fps: original.fps ?? undefined,
+            width: original.width ?? undefined,
+            height: original.height ?? undefined,
+          });
+          // Parse JSON fields
+          response.component = {
+            ...newComponent,
+            tags: newComponent.tags ? JSON.parse(newComponent.tags) : [],
+            ideaJson: newComponent.ideaJson ? JSON.parse(newComponent.ideaJson) : null,
+          };
+        }
+      }
+    }
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error getting edit job status:', error);
+    res.status(500).json({
+      error: 'Failed to get edit job status',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

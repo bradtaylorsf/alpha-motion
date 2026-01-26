@@ -8,6 +8,7 @@ import { DetailsPanel } from '../components/editor/DetailsPanel';
 import { FullAssetsPanel } from '../components/editor/FullAssetsPanel';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useAssets } from '../hooks/useAssets';
+import { useEditGeneration } from '../hooks/useEditGeneration';
 import { getComponent, updateComponent } from '../lib/api';
 import type { Component } from '../types';
 import { cn } from '../lib/utils';
@@ -46,6 +47,18 @@ export function ComponentEditor() {
     editAsset,
     removeBackground,
   } = useAssets(id);
+
+  // Edit/Remix generation
+  const {
+    edit,
+    remix,
+    isEditing,
+    isRemixing,
+    editedComponent,
+    remixedComponent,
+    error: editError,
+    reset: resetEdit,
+  } = useEditGeneration();
 
   // Load component
   useEffect(() => {
@@ -91,6 +104,24 @@ export function ComponentEditor() {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
+
+  // Handle successful edit - update code
+  useEffect(() => {
+    if (editedComponent && editedComponent.sourceCode) {
+      setCode(editedComponent.sourceCode);
+      setComponent(editedComponent);
+      setHasUnsavedChanges(false);
+      resetEdit();
+    }
+  }, [editedComponent, resetEdit]);
+
+  // Handle successful remix - navigate to new component
+  useEffect(() => {
+    if (remixedComponent) {
+      navigate(`/component/${remixedComponent.id}`);
+      resetEdit();
+    }
+  }, [remixedComponent, navigate, resetEdit]);
 
   // Save handler
   const handleSave = useCallback(async () => {
@@ -146,6 +177,19 @@ export function ComponentEditor() {
   const handleRemoveBackground = useCallback((assetId: string) => {
     removeBackground(assetId);
   }, [removeBackground]);
+
+  // Edit/Remix handlers
+  const handleEdit = useCallback((instructions: string) => {
+    if (id) {
+      edit(id, instructions);
+    }
+  }, [id, edit]);
+
+  const handleRemix = useCallback((instructions: string) => {
+    if (id) {
+      remix(id, instructions);
+    }
+  }, [id, remix]);
 
   if (loading) {
     return (
@@ -299,10 +343,16 @@ export function ComponentEditor() {
                 />
               </div>
 
-              {/* Details panel - settings and export only */}
+              {/* Details panel - edit, settings, and export */}
               <DetailsPanel
                 component={component}
+                assets={assets}
                 onSettingsChange={handleSettingsChange}
+                onEdit={handleEdit}
+                onRemix={handleRemix}
+                isEditing={isEditing}
+                isRemixing={isRemixing}
+                editError={editError}
               />
             </div>
           </Panel>

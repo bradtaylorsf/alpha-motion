@@ -312,3 +312,38 @@ export async function startRender(
 export async function getRenderStatus(jobId: string): Promise<RenderJob> {
   return fetchJson<RenderJob>(`${API_BASE}/render/${jobId}/status`);
 }
+
+// Edit/Remix API
+export interface EditGenerationJob {
+  jobId: string;
+  status: 'queued' | 'generating' | 'complete' | 'failed';
+  type: 'edit' | 'remix';
+  error?: string;
+  component?: Component;
+}
+
+export async function startEditComponent(
+  componentId: string,
+  instructions: string
+): Promise<string> {
+  const result = await fetchJson<{ jobId: string }>(`${API_BASE}/generate/edit`, {
+    method: 'POST',
+    body: JSON.stringify({ componentId, instructions }),
+  });
+  return result.jobId;
+}
+
+export async function startRemixComponent(
+  componentId: string,
+  instructions: string
+): Promise<string> {
+  const result = await fetchJson<{ jobId: string }>(`${API_BASE}/generate/remix`, {
+    method: 'POST',
+    body: JSON.stringify({ componentId, instructions }),
+  });
+  return result.jobId;
+}
+
+export async function getEditGenerationStatus(jobId: string): Promise<EditGenerationJob> {
+  return fetchJson<EditGenerationJob>(`${API_BASE}/generate/edit/${jobId}/status`);
+}

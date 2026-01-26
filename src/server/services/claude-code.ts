@@ -219,3 +219,158 @@ export function getJobStatus(jobId: string): GenerationJob | undefined {
 export function deleteJob(jobId: string): boolean {
   return jobs.delete(jobId);
 }
+
+// Edit/Remix generation types and functions
+export interface EditGenerationJob {
+  id: string;
+  status: 'queued' | 'generating' | 'complete' | 'failed';
+  type: 'edit' | 'remix';
+  componentId: string;
+  instructions: string;
+  result?: string;
+  error?: string;
+  startedAt?: Date;
+  completedAt?: Date;
+}
+
+const editJobs = new Map<string, EditGenerationJob>();
+
+function buildEditPrompt(
+  currentCode: string,
+  editInstructions: string,
+  assets?: AssetInfo[]
+): string {
+  let assetSection = '';
+  if (assets && assets.length > 0) {
+    const assetList = assets.map((a, i) => {
+      const type = a.type || inferAssetType(a.prompt);
+      return `  ${i + 1}. ${type.toUpperCase()}: "${a.prompt}"
+     URL: ${a.url}`;
+    }).join('\n\n');
+
+    assetSection = `
+## Available Image Assets
+The following image assets are available for use in this component. Claude can analyze these images visually to understand what they contain.
+
+${assetList}
+
+To use these assets, import Img from remotion:
+\`\`\`tsx
+import { Img } from 'remotion';
+<Img src="asset-url-here" style={{ ... }} />
+\`\`\`
+`;
+  }
+
+  return `You are editing an existing Remotion animation component.
+
+## Current Component Code
+\`\`\`tsx
+${currentCode}
+\`\`\`
+${assetSection}
+## Edit Instructions
+${editInstructions}
+
+## Requirements
+1. Make ONLY the changes requested - preserve everything else
+2. Keep the same component name "MyAnimation" as the default export
+3. Keep the constants-first pattern (customizable values defined as constants at the top)
+4. If assets are available and relevant, incorporate them appropriately
+5. Return the complete modified component
+
+Return ONLY the TypeScript/TSX code. No explanations, no markdown code blocks, just the raw code starting with import statements.`;
+}
+
+async function runEditGeneration(jobId: string, currentCode: string, assets?: AssetInfo[]): Promise<void> {
+  const job = editJobs.get(jobId);
+  if (!job) return;
+
+  job.status = 'generating';
+  job.startedAt = new Date();
+
+  const prompt = buildEditPrompt(currentCode, job.instructions, assets);
+
+  const claudePath = process.env.CLAUDE_PATH || '/Users/bradtaylor/.local/bin/claude';
+  console.log(`[Edit ${jobId}] Starting ${job.type} for component: ${job.componentId}`);
+  console.log(`[Edit ${jobId}] Running claude CLI at: ${claudePath}`);
+
+  return new Promise<void>((resolve) => {
+    const claude = spawn('/bin/bash', ['-c', `"${claudePath}" --print --output-format text`], {
+      cwd: process.cwd(),
+      env: { ...process.env },
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+
+    let output = '';
+    let error = '';
+
+    claude.stdin.write(prompt);
+    claude.stdin.end();
+
+    claude.stdout.on('data', (data) => {
+      output += data.toString();
+      console.log(`[Edit ${jobId}] Received ${data.length} bytes of output`);
+    });
+
+    claude.stderr.on('data', (data) => {
+      error += data.toString();
+      console.log(`[Edit ${jobId}] stderr: ${data.toString()}`);
+    });
+
+    claude.on('close', (code) => {
+      job.completedAt = new Date();
+      console.log(`[Edit ${jobId}] Process exited with code: ${code}`);
+
+      if (code === 0 && output.trim()) {
+        job.status = 'complete';
+        job.result = extractCode(output);
+        console.log(`[Edit ${jobId}] SUCCESS - Generated ${job.result.length} chars of code`);
+      } else {
+        job.status = 'failed';
+        job.error = error || 'Edit generation failed - no output received';
+        console.log(`[Edit ${jobId}] FAILED: ${job.error}`);
+      }
+      resolve();
+    });
+
+    claude.on('error', (err) => {
+      job.completedAt = new Date();
+      job.status = 'failed';
+      job.error = err.message;
+      console.log(`[Edit ${jobId}] SPAWN ERROR: ${err.message}`);
+      resolve();
+    });
+  });
+}
+
+export function startEditGeneration(
+  componentId: string,
+  currentCode: string,
+  instructions: string,
+  type: 'edit' | 'remix',
+  assets?: AssetInfo[]
+): string {
+  const jobId = uuid();
+
+  editJobs.set(jobId, {
+    id: jobId,
+    status: 'queued',
+    type,
+    componentId,
+    instructions,
+  });
+
+  // Start generation in background
+  setImmediate(() => runEditGeneration(jobId, currentCode, assets));
+
+  return jobId;
+}
+
+export function getEditJobStatus(jobId: string): EditGenerationJob | undefined {
+  return editJobs.get(jobId);
+}
+
+export function deleteEditJob(jobId: string): boolean {
+  return editJobs.delete(jobId);
+}
