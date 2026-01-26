@@ -132,6 +132,38 @@ export async function generateAssetBatch(
   });
 }
 
+export interface UploadAssetOptions {
+  componentId?: string;
+  name?: string;
+}
+
+export async function uploadAsset(
+  file: File,
+  options?: UploadAssetOptions
+): Promise<Asset> {
+  const formData = new FormData();
+  formData.append('image', file);
+  if (options?.componentId) {
+    formData.append('componentId', options.componentId);
+  }
+  if (options?.name) {
+    formData.append('name', options.name);
+  }
+
+  const response = await fetch(`${API_BASE}/assets/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.message || error.error || `HTTP ${response.status}`);
+  }
+
+  const result = await response.json();
+  return result.asset;
+}
+
 export async function getAssets(componentId?: string): Promise<Asset[]> {
   const url = componentId
     ? `${API_BASE}/assets?componentId=${componentId}`

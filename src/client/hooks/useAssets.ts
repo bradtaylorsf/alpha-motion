@@ -4,6 +4,7 @@ import {
   getAsset,
   generateAsset as apiGenerateAsset,
   generateAssetBatch as apiGenerateAssetBatch,
+  uploadAsset as apiUploadAsset,
   updateAsset as apiUpdateAsset,
   deleteAsset as apiDeleteAsset,
   linkAssetToComponent as apiLinkAssetToComponent,
@@ -12,6 +13,7 @@ import {
   type GenerateAssetOptions,
   type EditAssetOptions,
   type RemoveBackgroundOptions,
+  type UploadAssetOptions,
 } from '../lib/api';
 import type { Asset } from '../types';
 
@@ -19,6 +21,7 @@ export function useAssets(componentId?: string) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [removingBackground, setRemovingBackground] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +86,24 @@ export function useAssets(componentId?: string) {
         return { assets: [], errors: [{ prompt: 'batch', error: String(e) }] };
       } finally {
         setGenerating(false);
+      }
+    },
+    []
+  );
+
+  const uploadAsset = useCallback(
+    async (file: File, options?: UploadAssetOptions) => {
+      setUploading(true);
+      setError(null);
+      try {
+        const asset = await apiUploadAsset(file, options);
+        setAssets((prev) => [asset, ...prev]);
+        return asset;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to upload asset');
+        return null;
+      } finally {
+        setUploading(false);
       }
     },
     []
@@ -176,6 +197,7 @@ export function useAssets(componentId?: string) {
     assets,
     loading,
     generating,
+    uploading,
     editing,
     removingBackground,
     error,
@@ -183,6 +205,7 @@ export function useAssets(componentId?: string) {
     fetchAsset,
     generateAsset,
     generateFromSuggestions,
+    uploadAsset,
     updateAsset,
     linkToComponent,
     deleteAsset,

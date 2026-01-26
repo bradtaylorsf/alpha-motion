@@ -1,10 +1,44 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { PendingIdea, AnimationIdea, GenerationSettings, Asset } from '../../types';
 import { useAssets } from '../../hooks/useAssets';
-import { AssetGenerator, type GenerateOptions } from '../assets/AssetGenerator';
 import { AssetLibrary } from '../assets/AssetLibrary';
 import { AssetEditModal } from '../assets/AssetEditModal';
 import { AssetFullPreviewModal } from '../assets/AssetFullPreviewModal';
+import { cn } from '../../lib/utils';
+
+type AssetType = 'background' | 'icon' | 'texture' | 'character' | 'object';
+
+const ASSET_TYPES: { value: AssetType; label: string; aspect: '16:9' | '1:1' | '3:4' }[] = [
+  { value: 'background', label: 'Background', aspect: '16:9' },
+  { value: 'icon', label: 'Icon', aspect: '1:1' },
+  { value: 'texture', label: 'Texture', aspect: '1:1' },
+  { value: 'character', label: 'Character', aspect: '3:4' },
+  { value: 'object', label: 'Object', aspect: '1:1' },
+];
+
+function getAspectForType(type: AssetType): '16:9' | '1:1' | '3:4' {
+  return ASSET_TYPES.find((t) => t.value === type)?.aspect || '1:1';
+}
+
+function inferAssetType(prompt: string): AssetType {
+  const lower = prompt.toLowerCase();
+  if (lower.includes('background') || lower.includes('backdrop') || lower.includes('scene') || lower.includes('landscape')) return 'background';
+  if (lower.includes('icon') || lower.includes('logo') || lower.includes('symbol') || lower.includes('badge')) return 'icon';
+  if (lower.includes('texture') || lower.includes('pattern') || lower.includes('overlay')) return 'texture';
+  if (lower.includes('character') || lower.includes('person') || lower.includes('avatar') || lower.includes('portrait')) return 'character';
+  return 'object';
+}
+
+function enhancePromptForType(prompt: string, type: AssetType): string {
+  const styleHints: Record<AssetType, string> = {
+    background: 'wide panoramic scene, full background image, atmospheric, suitable as video background',
+    icon: 'simple icon design, centered, isolated on plain background, clean minimal style',
+    texture: 'seamless tileable pattern, repeating texture, no distinct focal point',
+    character: 'character portrait, centered subject, clean background, suitable for cutout',
+    object: 'single object, centered, clean simple background, product-style photography',
+  };
+  return `${prompt}. Style: ${styleHints[type]}`;
+}
 
 interface IdeaEditModalProps {
   pendingIdea: PendingIdea;
@@ -27,26 +61,36 @@ export function IdeaEditModal({
   const [idea, setIdea] = useState<AnimationIdea>(pendingIdea.idea);
   const [settings, setSettings] = useState<GenerationSettings>(pendingIdea.settings);
   const [newColor, setNewColor] = useState('#3b82f6');
-  const [newAssetPrompt, setNewAssetPrompt] = useState('');
-  const [remixPrompt, setRemixPrompt] = useState<string | null>(null);
+
+  // Asset generation state
+  const [assetPrompt, setAssetPrompt] = useState('');
+  const [selectedAssetType, setSelectedAssetType] = useState<AssetType>('object');
+  const [transparentBackground, setTransparentBackground] = useState(false);
 
   // Assets hook - we'll manage assets locally but sync with parent
   const {
     generating: assetsGenerating,
+    uploading: assetsUploading,
     editing: assetsEditing,
     removingBackground,
     generateAsset,
-    generateFromSuggestions,
+    uploadAsset,
     deleteAsset,
     editAsset,
     removeBackground,
   } = useAssets();
+
+  const isProcessing = assetsGenerating || assetsUploading || assetsEditing || removingBackground;
 
   // Edit modal state
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
   // Full preview modal state
   const [previewingAsset, setPreviewingAsset] = useState<Asset | null>(null);
+
+  // Upload state
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Local assets state (synced from pendingIdea)
   const [localAssets, setLocalAssets] = useState<Asset[]>(pendingIdea.assets);
@@ -65,36 +109,72 @@ export function IdeaEditModal({
     return () => window.removeEventListener('keydown', handleEsc);
   }, [onClose]);
 
-  const handleGenerateAsset = async (prompt: string, options?: GenerateOptions) => {
-    const asset = await generateAsset(prompt, {
-      aspectRatio: options?.aspectRatio,
-      transparent: options?.transparent,
+  const handleFileSelect = useCallback((files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    // Upload each file
+    Array.from(files).forEach(async (file) => {
+      if (file.type.startsWith('image/')) {
+        const asset = await uploadAsset(file);
+        if (asset) {
+          setLocalAssets((prev) => [asset, ...prev]);
+          onAssetGenerated(asset);
+        }
+      }
+    });
+  }, [uploadAsset, onAssetGenerated]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    handleFileSelect(e.dataTransfer.files);
+  }, [handleFileSelect]);
+
+  const handleGenerateAsset = async () => {
+    if (!assetPrompt.trim() || assetsGenerating) return;
+    const enhancedPrompt = enhancePromptForType(assetPrompt.trim(), selectedAssetType);
+    const asset = await generateAsset(enhancedPrompt, {
+      aspectRatio: getAspectForType(selectedAssetType),
+      transparent: transparentBackground,
+    });
+    if (asset) {
+      setLocalAssets((prev) => [asset, ...prev]);
+      onAssetGenerated(asset);
+      setAssetPrompt('');
+    }
+  };
+
+  const handleGenerateSuggestion = async (suggestion: string) => {
+    if (assetsGenerating) return;
+    const type = inferAssetType(suggestion);
+    const enhancedPrompt = enhancePromptForType(suggestion, type);
+    const asset = await generateAsset(enhancedPrompt, {
+      aspectRatio: getAspectForType(type),
     });
     if (asset) {
       setLocalAssets((prev) => [asset, ...prev]);
       onAssetGenerated(asset);
     }
-    return asset;
-  };
-
-  const handleGenerateBatch = async (prompts: string[], options?: GenerateOptions) => {
-    const result = await generateFromSuggestions(prompts, {
-      aspectRatio: options?.aspectRatio,
-    });
-    if (result.assets.length > 0) {
-      setLocalAssets((prev) => [...result.assets, ...prev]);
-      result.assets.forEach(onAssetGenerated);
-    }
-    return result;
   };
 
   const handleRemixAsset = (asset: Asset) => {
-    // Extract the original prompt (before enhancement) if possible
-    // The promptUsed might contain the enhanced version, so we use the asset name as fallback
     const originalPrompt = asset.promptUsed?.split('. Style:')[0] || asset.name;
-    setRemixPrompt(originalPrompt);
-    // Scroll to generator (it's at the top of assets section)
-    document.getElementById('asset-generator')?.scrollIntoView({ behavior: 'smooth' });
+    setAssetPrompt(originalPrompt);
+    setSelectedAssetType(inferAssetType(originalPrompt));
+    document.getElementById('asset-section')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleDeleteAsset = async (assetId: string) => {
@@ -138,23 +218,6 @@ export function IdeaEditModal({
 
   const handleRemoveColor = (index: number) => {
     setIdea({ ...idea, colors: idea.colors.filter((_, i) => i !== index) });
-  };
-
-  const handleAddSuggestedAsset = () => {
-    if (newAssetPrompt.trim()) {
-      setIdea({
-        ...idea,
-        suggestedAssets: [...idea.suggestedAssets, newAssetPrompt.trim()],
-      });
-      setNewAssetPrompt('');
-    }
-  };
-
-  const handleRemoveSuggestedAsset = (index: number) => {
-    setIdea({
-      ...idea,
-      suggestedAssets: idea.suggestedAssets.filter((_, i) => i !== index),
-    });
   };
 
   const handleElementsChange = (value: string) => {
@@ -339,72 +402,140 @@ export function IdeaEditModal({
           </div>
 
           {/* Assets Section */}
-          <div className="border-t border-border pt-6">
+          <div id="asset-section" className="border-t border-border pt-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">Assets</h3>
 
-            {/* Add new suggested asset */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-foreground mb-1">
-                Suggested Asset Prompts
-              </label>
-              <div className="flex gap-2 mb-2">
+            {/* Generate Asset */}
+            <div className="space-y-3 mb-4">
+              {/* Type selector */}
+              <div className="flex flex-wrap gap-1">
+                {ASSET_TYPES.map((type) => (
+                  <button
+                    key={type.value}
+                    onClick={() => setSelectedAssetType(type.value)}
+                    disabled={isProcessing}
+                    className={cn(
+                      'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                      selectedAssetType === type.value
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                    )}
+                  >
+                    {type.label}
+                    <span className="ml-1 opacity-60">({type.aspect})</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Prompt input */}
+              <div className="flex gap-2">
                 <input
                   type="text"
-                  value={newAssetPrompt}
-                  onChange={(e) => setNewAssetPrompt(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddSuggestedAsset()}
-                  placeholder="Add a new asset prompt..."
-                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                  value={assetPrompt}
+                  onChange={(e) => setAssetPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleGenerateAsset()}
+                  placeholder={`Describe your ${selectedAssetType}...`}
+                  disabled={isProcessing}
+                  className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
                 />
                 <button
-                  onClick={handleAddSuggestedAsset}
-                  disabled={!newAssetPrompt.trim()}
-                  className="rounded-md bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
+                  onClick={handleGenerateAsset}
+                  disabled={isProcessing || !assetPrompt.trim()}
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
-                  Add
+                  {assetsGenerating ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+                  ) : (
+                    'Generate'
+                  )}
                 </button>
               </div>
 
-              {/* List of suggested assets with remove buttons */}
+              {/* Transparent toggle */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={transparentBackground}
+                  onClick={() => setTransparentBackground(!transparentBackground)}
+                  disabled={isProcessing}
+                  className={cn(
+                    'relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed',
+                    transparentBackground ? 'bg-primary' : 'bg-muted'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'pointer-events-none inline-block h-3 w-3 transform rounded-full bg-background shadow ring-0 transition-transform',
+                      transparentBackground ? 'translate-x-3' : 'translate-x-0'
+                    )}
+                  />
+                </button>
+                <span className="text-xs text-muted-foreground">
+                  Transparent background (slower)
+                </span>
+              </div>
+
+              {/* Suggested prompts */}
               {idea.suggestedAssets.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {idea.suggestedAssets.map((asset, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-1 rounded-full border border-border bg-background px-3 py-1 text-sm"
-                    >
-                      <span className="truncate max-w-[200px]">{asset}</span>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Suggestions from idea:</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {idea.suggestedAssets.map((suggestion, i) => (
                       <button
-                        onClick={() => handleRemoveSuggestedAsset(i)}
-                        className="ml-1 rounded-full p-0.5 hover:bg-destructive/20 hover:text-destructive"
+                        key={i}
+                        onClick={() => handleGenerateSuggestion(suggestion)}
+                        disabled={isProcessing}
+                        className="rounded-full bg-secondary px-2.5 py-1 text-xs text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50 transition-colors"
                       >
-                        <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        {suggestion}
                       </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Asset Generator */}
-            <div id="asset-generator">
-              <AssetGenerator
-                suggestedAssets={idea.suggestedAssets}
-                generating={assetsGenerating}
-                onGenerate={handleGenerateAsset}
-                onGenerateBatch={handleGenerateBatch}
-                initialPrompt={remixPrompt}
-                onInitialPromptUsed={() => setRemixPrompt(null)}
+            {/* Upload Area */}
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => !isProcessing && fileInputRef.current?.click()}
+              className={cn(
+                'relative rounded-md border-2 border-dashed p-4 text-center transition-colors cursor-pointer mb-4',
+                isDragging
+                  ? 'border-primary bg-primary/10'
+                  : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-secondary/50',
+                isProcessing && 'opacity-50 cursor-not-allowed'
+              )}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                multiple
+                onChange={(e) => handleFileSelect(e.target.files)}
+                className="hidden"
+                disabled={isProcessing}
               />
+              {assetsUploading ? (
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  Uploading...
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {isDragging ? 'Drop images here' : 'Click or drag to upload images'}
+                </p>
+              )}
             </div>
 
-            {/* Generated Assets */}
+            {/* Assets Library */}
             {localAssets.length > 0 && (
               <div className="mt-4">
                 <h4 className="text-sm font-medium text-foreground mb-2">
-                  Generated Assets ({localAssets.length})
+                  Your Assets ({localAssets.length})
                 </h4>
                 <AssetLibrary
                   assets={localAssets}

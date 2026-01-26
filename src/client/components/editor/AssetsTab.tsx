@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import type { Asset } from '../../types';
 import { cn } from '../../lib/utils';
 import { AssetEditModal } from '../assets/AssetEditModal';
@@ -8,10 +8,12 @@ interface AssetsTabProps {
   assets: Asset[];
   loading: boolean;
   generating: boolean;
+  uploading?: boolean;
   editing?: boolean;
   removingBackground?: boolean;
   suggestedAssets: string[];
   onGenerate: (prompt: string, options?: { transparent?: boolean }) => void;
+  onUpload?: (file: File) => Promise<Asset | null>;
   onDelete: (id: string) => void;
   onEdit?: (id: string, editPrompt: string) => Promise<Asset | null>;
   onRemoveBackground?: (id: string) => void;
@@ -21,10 +23,12 @@ export function AssetsTab({
   assets,
   loading,
   generating,
+  uploading = false,
   editing = false,
   removingBackground = false,
   suggestedAssets,
   onGenerate,
+  onUpload,
   onDelete,
   onEdit,
   onRemoveBackground,
@@ -33,6 +37,8 @@ export function AssetsTab({
   const [transparentBackground, setTransparentBackground] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [previewingAsset, setPreviewingAsset] = useState<Asset | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleGenerate = () => {
     if (customPrompt.trim()) {
@@ -41,7 +47,37 @@ export function AssetsTab({
     }
   };
 
-  const isProcessing = generating || editing || removingBackground;
+  const handleFileSelect = useCallback((files: FileList | null) => {
+    if (!files || files.length === 0 || !onUpload) return;
+
+    // Upload each file
+    Array.from(files).forEach((file) => {
+      if (file.type.startsWith('image/')) {
+        onUpload(file);
+      }
+    });
+  }, [onUpload]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    handleFileSelect(e.dataTransfer.files);
+  }, [handleFileSelect]);
+
+  const isProcessing = generating || uploading || editing || removingBackground;
 
   return (
     <div className="space-y-4">
@@ -95,6 +131,58 @@ export function AssetsTab({
           </span>
         </div>
       </div>
+
+      {/* Upload area */}
+      {onUpload && (
+        <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          onClick={() => !isProcessing && fileInputRef.current?.click()}
+          className={cn(
+            'relative rounded-md border-2 border-dashed p-4 text-center transition-colors cursor-pointer',
+            isDragging
+              ? 'border-primary bg-primary/10'
+              : 'border-muted-foreground/25 hover:border-primary/50 hover:bg-secondary/50',
+            isProcessing && 'opacity-50 cursor-not-allowed'
+          )}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            multiple
+            onChange={(e) => handleFileSelect(e.target.files)}
+            className="hidden"
+            disabled={isProcessing}
+          />
+          {uploading ? (
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              Uploading...
+            </div>
+          ) : (
+            <>
+              <svg
+                className="mx-auto h-6 w-6 text-muted-foreground"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
+              </svg>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {isDragging ? 'Drop images here' : 'Click or drag images to upload'}
+              </p>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Suggested assets */}
       {suggestedAssets.length > 0 && (

@@ -5,10 +5,12 @@ import { Header } from '../components/layout/Header';
 import { CodePane } from '../components/editor/CodePane';
 import { PreviewPane } from '../components/editor/PreviewPane';
 import { DetailsPanel } from '../components/editor/DetailsPanel';
+import { FullAssetsPanel } from '../components/editor/FullAssetsPanel';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useAssets } from '../hooks/useAssets';
 import { getComponent, updateComponent } from '../lib/api';
 import type { Component } from '../types';
+import { cn } from '../lib/utils';
 
 export function ComponentEditor() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +26,9 @@ export function ComponentEditor() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Left panel tab state
+  const [leftTab, setLeftTab] = useState<'code' | 'assets'>('code');
+
   // Debounce code for preview (300ms delay)
   const debouncedCode = useDebouncedValue(code, 300);
 
@@ -32,9 +37,11 @@ export function ComponentEditor() {
     assets,
     loading: assetsLoading,
     generating: assetsGenerating,
+    uploading: assetsUploading,
     editing: assetsEditing,
     removingBackground,
     generateAsset,
+    uploadAsset,
     deleteAsset,
     editAsset,
     removeBackground,
@@ -115,11 +122,18 @@ export function ComponentEditor() {
   }, [id, component]);
 
   // Asset handlers
-  const handleGenerateAsset = useCallback((prompt: string, options?: { transparent?: boolean }) => {
+  const handleGenerateAsset = useCallback((prompt: string, options?: { transparent?: boolean; aspectRatio?: string }) => {
     if (id) {
-      generateAsset(prompt, { componentId: id, transparent: options?.transparent });
+      generateAsset(prompt, { componentId: id, transparent: options?.transparent, aspectRatio: options?.aspectRatio as '16:9' | '9:16' | '1:1' | '4:3' | '3:4' | undefined });
     }
   }, [id, generateAsset]);
+
+  const handleUploadAsset = useCallback((file: File) => {
+    if (id) {
+      return uploadAsset(file, { componentId: id });
+    }
+    return Promise.resolve(null);
+  }, [id, uploadAsset]);
 
   const handleDeleteAsset = useCallback((assetId: string) => {
     deleteAsset(assetId);
@@ -203,13 +217,69 @@ export function ComponentEditor() {
       {/* Main content */}
       <div className="flex-1 min-h-0">
         <PanelGroup direction="horizontal">
-          {/* Code editor panel */}
+          {/* Left panel with tabs */}
           <Panel defaultSize={50} minSize={30}>
-            <CodePane
-              code={code}
-              onChange={setCode}
-              onSave={handleSave}
-            />
+            <div className="h-full flex flex-col">
+              {/* Tab header */}
+              <div className="flex border-b border-border bg-card shrink-0">
+                <button
+                  onClick={() => setLeftTab('code')}
+                  className={cn(
+                    'px-4 py-2 text-sm font-medium transition-colors relative',
+                    leftTab === 'code'
+                      ? 'text-foreground border-b-2 border-primary -mb-px'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Code
+                  {hasUnsavedChanges && (
+                    <span className="ml-1.5 inline-block w-2 h-2 rounded-full bg-primary" />
+                  )}
+                </button>
+                <button
+                  onClick={() => setLeftTab('assets')}
+                  className={cn(
+                    'px-4 py-2 text-sm font-medium transition-colors relative',
+                    leftTab === 'assets'
+                      ? 'text-foreground border-b-2 border-primary -mb-px'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Assets
+                  {assets.length > 0 && (
+                    <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-muted px-1.5 text-xs">
+                      {assets.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Tab content */}
+              <div className="flex-1 min-h-0">
+                {leftTab === 'code' ? (
+                  <CodePane
+                    code={code}
+                    onChange={setCode}
+                    onSave={handleSave}
+                  />
+                ) : (
+                  <FullAssetsPanel
+                    assets={assets}
+                    loading={assetsLoading}
+                    generating={assetsGenerating}
+                    uploading={assetsUploading}
+                    editing={assetsEditing}
+                    removingBackground={removingBackground}
+                    suggestedAssets={component.ideaJson?.suggestedAssets || []}
+                    onGenerate={handleGenerateAsset}
+                    onUpload={handleUploadAsset}
+                    onDelete={handleDeleteAsset}
+                    onEdit={handleEditAsset}
+                    onRemoveBackground={handleRemoveBackground}
+                  />
+                )}
+              </div>
+            </div>
           </Panel>
 
           {/* Resize handle */}
@@ -229,19 +299,10 @@ export function ComponentEditor() {
                 />
               </div>
 
-              {/* Details panel */}
+              {/* Details panel - settings and export only */}
               <DetailsPanel
                 component={component}
-                assets={assets}
-                assetsLoading={assetsLoading}
-                assetsGenerating={assetsGenerating}
-                assetsEditing={assetsEditing}
-                removingBackground={removingBackground}
                 onSettingsChange={handleSettingsChange}
-                onGenerateAsset={handleGenerateAsset}
-                onDeleteAsset={handleDeleteAsset}
-                onEditAsset={handleEditAsset}
-                onRemoveBackground={handleRemoveBackground}
               />
             </div>
           </Panel>

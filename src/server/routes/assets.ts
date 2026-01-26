@@ -1,4 +1,8 @@
 import { Router } from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
 import {
   generateImage,
   editImage,
@@ -19,6 +23,39 @@ import {
 } from '../services/asset-store';
 
 const router = Router();
+
+// Configure multer for file uploads
+const UPLOADS_DIR = path.join(process.cwd(), 'public', 'assets', 'uploaded');
+
+// Ensure uploads directory exists
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.png';
+    cb(null, `${uuidv4()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP are allowed.'));
+    }
+  },
+});
 
 // Parse asset for response (parse JSON fields)
 function parseAsset(asset: ReturnType<typeof getAsset> extends Promise<infer T> ? T : never) {
@@ -142,6 +179,41 @@ router.post('/generate/batch', async (req, res) => {
     console.error('Error in batch generation:', error);
     res.status(500).json({
       error: 'Failed to generate images',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// Upload an image
+router.post('/upload', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { componentId, name } = req.body;
+    const filePath = `/assets/uploaded/${req.file.filename}`;
+
+    // Store in database
+    const asset = await createAsset({
+      name: name || req.file.originalname.replace(/\.[^/.]+$/, '').slice(0, 50),
+      componentId,
+      type: 'uploaded',
+      source: 'local',
+      filePath,
+      promptUsed: undefined,
+      metadata: {
+        originalFilename: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+      },
+    });
+
+    res.json({ asset: parseAsset(asset) });
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    res.status(500).json({
+      error: 'Failed to upload image',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

@@ -41,3 +41,7 @@ public/assets/generated/*
 # Rendered videos
 public/assets/renders/*
 !public/assets/renders/.gitkeep
+
+# Uploaded assets
+public/assets/uploaded/*
+!public/assets/uploaded/.gitkeep

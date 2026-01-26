@@ -1,50 +1,30 @@
 import { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { SettingsTab } from './SettingsTab';
-import { AssetsTab } from './AssetsTab';
 import { ExportTab } from './ExportTab';
-import type { Component, Asset } from '../../types';
+import type { Component } from '../../types';
 
 interface DetailsPanelProps {
   component: Component;
-  assets: Asset[];
-  assetsLoading: boolean;
   onSettingsChange: (settings: Partial<Pick<Component, 'durationFrames' | 'fps' | 'width' | 'height'>>) => void;
-  onGenerateAsset: (prompt: string, options?: { transparent?: boolean }) => void;
-  onDeleteAsset: (id: string) => void;
-  onEditAsset?: (id: string, editPrompt: string) => Promise<Asset | null>;
-  onRemoveBackground?: (id: string) => void;
-  assetsGenerating: boolean;
-  assetsEditing?: boolean;
-  removingBackground?: boolean;
 }
 
-type TabType = 'settings' | 'assets' | 'export';
+type TabType = 'settings' | 'export';
 
 export function DetailsPanel({
   component,
-  assets,
-  assetsLoading,
   onSettingsChange,
-  onGenerateAsset,
-  onDeleteAsset,
-  onEditAsset,
-  onRemoveBackground,
-  assetsGenerating,
-  assetsEditing,
-  removingBackground,
 }: DetailsPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('settings');
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const tabs: { id: TabType; label: string; badge?: number }[] = [
+  const tabs: { id: TabType; label: string }[] = [
     { id: 'settings', label: 'Settings' },
-    { id: 'assets', label: 'Assets', badge: assets.length || undefined },
     { id: 'export', label: 'Export' },
   ];
 
   return (
-    <div className={cn('border-t border-border bg-card flex flex-col', isCollapsed ? 'h-10' : 'h-64')}>
+    <div className={cn('border-t border-border bg-card flex flex-col', isCollapsed ? 'h-10' : 'h-48')}>
       {/* Tab header */}
       <div className="flex items-center justify-between border-b border-border px-2 shrink-0">
         <div className="flex">
@@ -63,11 +43,6 @@ export function DetailsPanel({
               )}
             >
               {tab.label}
-              {tab.badge && (
-                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-muted px-1.5 text-xs">
-                  {tab.badge}
-                </span>
-              )}
             </button>
           ))}
         </div>
@@ -96,20 +71,6 @@ export function DetailsPanel({
               width={component.width}
               height={component.height}
               onChange={onSettingsChange}
-            />
-          )}
-          {activeTab === 'assets' && (
-            <AssetsTab
-              assets={assets}
-              loading={assetsLoading}
-              generating={assetsGenerating}
-              editing={assetsEditing}
-              removingBackground={removingBackground}
-              suggestedAssets={component.ideaJson?.suggestedAssets || []}
-              onGenerate={onGenerateAsset}
-              onDelete={onDeleteAsset}
-              onEdit={onEditAsset}
-              onRemoveBackground={onRemoveBackground}
             />
           )}
           {activeTab === 'export' && (
