@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBoardItems } from '../hooks/useBoardItems';
 import { IdeaInput } from './IdeaInput';
 import { BoardItemCard } from './BoardItemCard';
-import { PreviewModal } from './preview/PreviewModal';
 import { IdeaEditModal } from './ideas/IdeaEditModal';
 import { parseTags } from '../lib/utils';
-import type { Component, PendingIdea } from '../types';
+import type { PendingIdea } from '../types';
 
 export function UnifiedBoard() {
+  const navigate = useNavigate();
   const {
     boardItems,
     loading,
@@ -26,7 +27,6 @@ export function UnifiedBoard() {
     dismissFailed,
   } = useBoardItems();
 
-  const [selectedComponent, setSelectedComponent] = useState<Component | null>(null);
   const [selectedPendingIdea, setSelectedPendingIdea] = useState<PendingIdea | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -172,7 +172,7 @@ export function UnifiedBoard() {
                   item={item}
                   onClick={
                     item.type === 'component'
-                      ? () => setSelectedComponent(item.data)
+                      ? () => navigate(`/component/${item.data.id}`)
                       : undefined
                   }
                   onDelete={
@@ -214,21 +214,6 @@ export function UnifiedBoard() {
           )}
         </div>
       </div>
-
-      {/* Preview Modal for completed components */}
-      {selectedComponent && (
-        <PreviewModal
-          component={selectedComponent}
-          onClose={() => setSelectedComponent(null)}
-          onRemix={async () => {
-            // Create a pending idea from the component
-            const pending = await remixComponent(selectedComponent);
-            // Close preview and open edit modal
-            setSelectedComponent(null);
-            setSelectedPendingIdea(pending);
-          }}
-        />
-      )}
 
       {/* Edit Modal for pending ideas */}
       {selectedPendingIdea && (
