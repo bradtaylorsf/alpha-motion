@@ -15,6 +15,8 @@ const config = {
     '**/node_modules/better-sqlite3/**/*',
     '**/node_modules/keytar/**/*',
     '**/node_modules/sharp/**/*',
+    '**/node_modules/@remotion/compositor-*/**/*',
+    '**/node_modules/@remotion/bundler/**/*',
     '**/*.node',
   ],
   npmRebuild: true,

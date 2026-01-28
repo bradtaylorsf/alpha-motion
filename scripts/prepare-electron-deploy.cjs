@@ -25,39 +25,12 @@ fs.copyFileSync(
   path.join(deployDir, 'package.json')
 );
 
-// Use npm to install production dependencies
-console.log('Installing production dependencies with npm...');
-execSync('npm install --omit=dev --legacy-peer-deps', {
+// Use pnpm to install production dependencies (uses symlinks instead of hardlinks)
+console.log('Installing production dependencies with pnpm...');
+execSync('pnpm install --prod --shamefully-hoist --node-linker=hoisted', {
   cwd: deployDir,
   stdio: 'inherit',
 });
-
-// Break hardlinks by copying with rsync (which breaks hardlinks by default)
-// This is needed because npm creates hardlinks for duplicate files
-console.log('Breaking hardlinks in node_modules...');
-const nodeModulesDir = path.join(deployDir, 'node_modules');
-const tempDir = path.join(deployDir, 'node_modules_temp');
-if (fs.existsSync(nodeModulesDir)) {
-  const isWindows = process.platform === 'win32';
-  if (isWindows) {
-    // On Windows, robocopy breaks hardlinks by default
-    // /E = copy subdirs including empty, /MOVE = move files, /NFL /NDL /NJH /NJS = quiet output
-    execSync(`robocopy "${nodeModulesDir}" "${tempDir}" /E /MOVE /NFL /NDL /NJH /NJS`, {
-      stdio: 'inherit',
-      // robocopy returns non-zero on success, so we ignore errors < 8
-    });
-    // robocopy moves, so nodeModulesDir should be empty or gone
-    if (fs.existsSync(nodeModulesDir)) {
-      fs.rmSync(nodeModulesDir, { recursive: true });
-    }
-    fs.renameSync(tempDir, nodeModulesDir);
-  } else {
-    // On Unix, use rsync which breaks hardlinks by default
-    execSync(`rsync -a --delete "${nodeModulesDir}/" "${tempDir}/"`, { stdio: 'inherit' });
-    fs.rmSync(nodeModulesDir, { recursive: true });
-    fs.renameSync(tempDir, nodeModulesDir);
-  }
-}
 
 // Copy built files to deploy directory
 console.log('Copying built files...');
