@@ -52,7 +52,7 @@ jobs:
             fi
           fi
 
-  # Build for each platform
+  # Build for each platform using Electron Forge
   build:
     needs: check-release
     if: needs.check-release.outputs.should_release == 'true'
@@ -61,10 +61,13 @@ jobs:
       matrix:
         include:
           - os: macos-latest
-            platform: mac
-            arch: universal
+            platform: darwin
+            arch: x64
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
           - os: windows-latest
-            platform: win
+            platform: win32
             arch: x64
           - os: ubuntu-latest
             platform: linux
@@ -102,80 +105,41 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      # macOS specific: Install Apple certificates for code signing
-      - name: Install Apple certificates
-        if: matrix.platform == 'mac'
-        env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-          MACOS_KEYCHAIN_PWD: ${{ secrets.MACOS_KEYCHAIN_PWD }}
-        run: |
-          if [ -n "$MACOS_CERTIFICATE" ]; then
-            # Create variables
-            CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
-            KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-
-            # Import certificate from secrets
-            echo -n "$MACOS_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
-
-            # Create temporary keychain
-            security create-keychain -p "$MACOS_KEYCHAIN_PWD" $KEYCHAIN_PATH
-            security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
-            security unlock-keychain -p "$MACOS_KEYCHAIN_PWD" $KEYCHAIN_PATH
-
-            # Import certificate to keychain
-            security import $CERTIFICATE_PATH -P "$MACOS_CERTIFICATE_PWD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
-            security list-keychain -d user -s $KEYCHAIN_PATH
-            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_KEYCHAIN_PWD" $KEYCHAIN_PATH
-          else
-            echo "No certificate provided, building unsigned"
-          fi
-
       # Linux specific: Install build dependencies
       - name: Install Linux dependencies
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libarchive-tools rpm
+          sudo apt-get install -y dpkg fakeroot rpm
 
-      - name: Build Electron app
+      - name: Build application
+        run: pnpm run build:electron
+
+      - name: Make distributables
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Disable all code signing auto-discovery
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          WIN_CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          pnpm run dist:${{ matrix.platform }}
+          pnpm exec electron-forge make --arch=${{ matrix.arch }}
+
+      - name: List output files
+        shell: bash
+        run: |
+          echo "=== Output directory contents ==="
+          find out -type f -name "*.*" | head -50 || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.platform }}
+          name: release-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            release/*.dmg
-            release/*.zip
-            release/*.exe
-            release/*.msi
-            release/*.AppImage
-            release/*.deb
-            release/*.rpm
-            release/*.yml
-            release/*.yaml
-            !release/*-unpacked
-            !release/mac
-            !release/mac-arm64
-            !release/win-unpacked
-            !release/linux-unpacked
-          if-no-files-found: error
+            out/make/**/*.dmg
+            out/make/**/*.zip
+            out/make/**/*.exe
+            out/make/**/*.nupkg
+            out/make/**/*.deb
+            out/make/**/*.rpm
+          if-no-files-found: warn
           retention-days: 7
-
-      # Cleanup macOS keychain
-      - name: Cleanup keychain
-        if: matrix.platform == 'mac' && always()
-        run: |
-          if [ -f "$RUNNER_TEMP/app-signing.keychain-db" ]; then
-            security delete-keychain $RUNNER_TEMP/app-signing.keychain-db
-          fi
 
   # Create GitHub Release with all artifacts
   release:
@@ -196,48 +160,45 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p final-release
+
+          echo "=== Downloaded artifacts ==="
+          find release-artifacts -type f | head -50
+
+          # Copy all distributable files
           find release-artifacts -type f \( \
             -name "*.dmg" -o \
             -name "*.zip" -o \
             -name "*.exe" -o \
-            -name "*.msi" -o \
-            -name "*.AppImage" -o \
             -name "*.deb" -o \
-            -name "*.rpm" -o \
-            -name "*.yml" -o \
-            -name "*.yaml" \
+            -name "*.rpm" \
           \) -exec cp {} final-release/ \;
 
-          echo "Release files:"
-          ls -la final-release/
+          echo "=== Final release files ==="
+          ls -la final-release/ || echo "No files found"
 
       - name: Generate release notes
         id: release_notes
         run: |
           VERSION=${{ needs.check-release.outputs.version }}
 
-          # Generate download links section
           cat << 'EOF' > release_notes.md
           ## Downloads
 
           ### macOS
-          - **Apple Silicon (M1/M2/M3)**: `Answer-Motion-$VERSION-arm64.dmg`
-          - **Intel**: `Answer-Motion-$VERSION-x64.dmg`
+          - **Apple Silicon (M1/M2/M3)**: Download the `arm64` DMG or ZIP
+          - **Intel**: Download the `x64` DMG or ZIP
 
           ### Windows
-          - **Installer**: `Answer-Motion-Setup-$VERSION.exe`
-          - **Portable**: `Answer-Motion-$VERSION-win.zip`
+          - **Installer**: Download the `.exe` file
+          - **Portable**: Download the Windows ZIP
 
           ### Linux
-          - **AppImage**: `Answer-Motion-$VERSION.AppImage`
-          - **Debian/Ubuntu**: `answer-motion_$VERSION_amd64.deb`
+          - **Debian/Ubuntu**: Download the `.deb` file
+          - **Red Hat/Fedora**: Download the `.rpm` file
 
           ## What's Changed
 
           EOF
-
-          # Replace $VERSION placeholder
-          sed -i "s/\$VERSION/$VERSION/g" release_notes.md
 
           # Add recent commits as changelog
           git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD~10)..HEAD >> release_notes.md 2>/dev/null || \
@@ -246,7 +207,7 @@ jobs:
           echo "" >> release_notes.md
           echo "" >> release_notes.md
           echo "---" >> release_notes.md
-          echo "*Built with ❤️ using GitHub Actions*" >> release_notes.md
+          echo "*Built with GitHub Actions using Electron Forge*" >> release_notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -263,7 +224,7 @@ jobs:
 
       - name: Summary
         run: |
-          echo "## 🎉 Release Created!" >> $GITHUB_STEP_SUMMARY
+          echo "## Release Created!" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Version:** v${{ needs.check-release.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
