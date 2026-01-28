@@ -10,15 +10,9 @@ const config = {
     app: 'electron-deploy',
   },
   files: ['**/*'],
-  asar: true,
-  asarUnpack: [
-    '**/node_modules/better-sqlite3/**/*',
-    '**/node_modules/keytar/**/*',
-    '**/node_modules/sharp/**/*',
-    '**/node_modules/@remotion/compositor-*/**/*',
-    '**/node_modules/@remotion/bundler/**/*',
-    '**/*.node',
-  ],
+  // Disable asar to avoid hardlink conflicts during packaging
+  // This results in slightly larger app size but reliable builds
+  asar: false,
   npmRebuild: true,
   nodeGypRebuild: false,
     // Artifact naming for cleaner release files

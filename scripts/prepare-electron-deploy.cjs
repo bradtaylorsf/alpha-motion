@@ -25,12 +25,51 @@ fs.copyFileSync(
   path.join(deployDir, 'package.json')
 );
 
-// Use pnpm to install production dependencies (uses symlinks instead of hardlinks)
+// Use pnpm to install production dependencies
 console.log('Installing production dependencies with pnpm...');
 execSync('pnpm install --prod --shamefully-hoist --node-linker=hoisted', {
   cwd: deployDir,
   stdio: 'inherit',
 });
+
+// Break all hardlinks by copying files through Node.js
+// This is necessary because electron-builder's FileCopier fails on hardlinked files
+console.log('Breaking hardlinks in node_modules...');
+function copyDirBreakHardlinks(src, dest) {
+  if (!fs.existsSync(dest)) {
+    fs.mkdirSync(dest, { recursive: true });
+  }
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirBreakHardlinks(srcPath, destPath);
+    } else if (entry.isSymbolicLink()) {
+      // Preserve symlinks as-is
+      const target = fs.readlinkSync(srcPath);
+      if (!fs.existsSync(destPath)) {
+        fs.symlinkSync(target, destPath);
+      }
+    } else {
+      // Copy file content (breaks hardlinks)
+      const content = fs.readFileSync(srcPath);
+      fs.writeFileSync(destPath, content);
+      // Preserve permissions
+      const stat = fs.statSync(srcPath);
+      fs.chmodSync(destPath, stat.mode);
+    }
+  }
+}
+
+const nodeModulesDir = path.join(deployDir, 'node_modules');
+const tempDir = path.join(deployDir, 'node_modules_temp');
+if (fs.existsSync(nodeModulesDir)) {
+  copyDirBreakHardlinks(nodeModulesDir, tempDir);
+  fs.rmSync(nodeModulesDir, { recursive: true });
+  fs.renameSync(tempDir, nodeModulesDir);
+}
+console.log('Hardlinks broken successfully');
 
 // Copy built files to deploy directory
 console.log('Copying built files...');
