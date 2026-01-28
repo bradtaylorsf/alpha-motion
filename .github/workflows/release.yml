@@ -105,14 +105,43 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      # macOS specific: Rebuild native modules for DMG creation
-      - name: Rebuild native modules for DMG
+      # macOS specific: Generate .icns icon and rebuild native modules
+      - name: Setup macOS build
         if: matrix.platform == 'darwin'
         run: |
+          # Generate .icns if not present
+          if [ ! -f build-resources/icon.icns ]; then
+            mkdir -p build-resources/icon.iconset
+            sips -z 16 16 build-resources/icon.png --out build-resources/icon.iconset/icon_16x16.png
+            sips -z 32 32 build-resources/icon.png --out build-resources/icon.iconset/icon_16x16@2x.png
+            sips -z 32 32 build-resources/icon.png --out build-resources/icon.iconset/icon_32x32.png
+            sips -z 64 64 build-resources/icon.png --out build-resources/icon.iconset/icon_32x32@2x.png
+            sips -z 128 128 build-resources/icon.png --out build-resources/icon.iconset/icon_128x128.png
+            sips -z 256 256 build-resources/icon.png --out build-resources/icon.iconset/icon_128x128@2x.png
+            sips -z 256 256 build-resources/icon.png --out build-resources/icon.iconset/icon_256x256.png
+            sips -z 512 512 build-resources/icon.png --out build-resources/icon.iconset/icon_256x256@2x.png
+            sips -z 512 512 build-resources/icon.png --out build-resources/icon.iconset/icon_512x512.png
+            sips -z 1024 1024 build-resources/icon.png --out build-resources/icon.iconset/icon_512x512@2x.png
+            iconutil -c icns build-resources/icon.iconset -o build-resources/icon.icns
+            rm -rf build-resources/icon.iconset
+          fi
+          # Rebuild native modules for DMG creation
           pnpm rebuild macos-alias fs-xattr || true
 
+      # Windows specific: Generate .ico icon
+      - name: Setup Windows build
+        if: matrix.platform == 'win32'
+        shell: pwsh
+        run: |
+          # Install ImageMagick for ico generation
+          choco install imagemagick -y
+          $env:Path = "C:\Program Files\ImageMagick-7.1.1-Q16-HDRI;$env:Path"
+          if (!(Test-Path build-resources/icon.ico)) {
+            magick build-resources/icon.png -define icon:auto-resize=256,128,64,48,32,16 build-resources/icon.ico
+          }
+
       # Linux specific: Install build dependencies
-      - name: Install Linux dependencies
+      - name: Setup Linux build
         if: matrix.platform == 'linux'
         run: |
           sudo apt-get update
@@ -208,9 +237,20 @@ jobs:
           - **Apple Silicon (M1/M2/M3)**: Download the `arm64` DMG or ZIP
           - **Intel**: Download the `x64` DMG or ZIP
 
+          > **⚠️ Important for macOS users**: This app is not code-signed. After downloading:
+          > 1. Open Finder and locate the downloaded DMG
+          > 2. **Right-click** (or Control-click) the DMG file and select **Open**
+          > 3. Click **Open** in the dialog that appears
+          > 4. After mounting, right-click the app and select **Open** the first time
+          >
+          > Or run this command in Terminal after mounting the DMG:
+          > ```
+          > xattr -cr "/Volumes/Answer Motion/Answer Motion.app"
+          > ```
+
           ### Windows
-          - **Installer**: Download the `.exe` file
-          - **Portable**: Download the Windows ZIP
+          - Download the `.zip` file and extract it
+          - Run `answer-motion.exe` from the extracted folder
 
           ### Linux
           - **Debian/Ubuntu**: Download the `.deb` file

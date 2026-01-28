@@ -2,6 +2,12 @@ const path = require('path');
 
 /**
  * Electron Forge Configuration
+ *
+ * IMPORTANT: The app is bundled by esbuild/vite, so we only need:
+ * - electron-dist/ (bundled electron main/preload)
+ * - dist/ (bundled client and server)
+ * - Native node modules that can't be bundled (better-sqlite3, keytar, sharp)
+ *
  * @type {import('@electron-forge/shared-types').ForgeConfig}
  */
 const config = {
@@ -16,59 +22,97 @@ const config = {
     appCategoryType: 'public.app-category.developer-tools',
     osxSign: false, // Disable signing for now
     osxNotarize: false,
-    // Include these directories in the app
-    extraResource: [],
-    // Ignore patterns - exclude dev files and packages
+    // Use asar for smaller package size and faster loading
+    // Native modules must be unpacked from asar to work properly
+    asar: {
+      unpack: '**/{*.node,*.dll,*.dylib,*.so,better-sqlite3/**/*,keytar/**/*,sharp/**/*}',
+    },
+    // Whitelist approach: only include what's needed
     ignore: (file) => {
-      // Always include root and electron-dist/dist/public
+      // Always include root
       if (!file) return false;
-      if (file === '/package.json') return false;
-      if (file.startsWith('/electron-dist')) return false;
-      if (file.startsWith('/dist')) return false;
-      if (file.startsWith('/public')) return false;
 
-      // Include node_modules but exclude dev-only packages
-      if (file.startsWith('/node_modules')) {
-        // Exclude @types packages (dev only)
-        if (file.includes('/@types/')) return true;
-        // Exclude build tools
-        if (file.includes('/@remotion/bundler')) return true;
-        if (file.includes('/typescript')) return true;
-        if (file.includes('/vite')) return true;
-        if (file.includes('/esbuild')) return true;
-        if (file.includes('/eslint')) return true;
-        if (file.includes('/tailwindcss')) return true;
-        if (file.includes('/postcss')) return true;
-        if (file.includes('/autoprefixer')) return true;
-        if (file.includes('/drizzle-kit')) return true;
-        if (file.includes('/@electron-forge')) return true;
-        if (file.includes('/electron-packager')) return true;
-        // Include all other node_modules
+      // Include package.json (required by Electron)
+      if (file === '/package.json') return false;
+
+      // Include bundled electron code
+      if (file.startsWith('/electron-dist')) return false;
+
+      // Include bundled client and server (but exclude generated user content)
+      if (file.startsWith('/dist')) {
+        // Exclude user-generated content to reduce package size
+        if (file.includes('/assets/generated/') && !file.endsWith('.gitkeep')) return true;
+        if (file.includes('/assets/uploaded/') && !file.endsWith('.gitkeep')) return true;
         return false;
       }
 
-      // Exclude source and config files
-      if (file.startsWith('/electron/')) return true;
-      if (file.startsWith('/src/')) return true;
-      if (file.startsWith('/scripts/')) return true;
-      if (file.startsWith('/.github')) return true;
-      if (file.startsWith('/.git')) return true;
-      if (file.startsWith('/.vscode')) return true;
-      if (file.endsWith('.map')) return true;
-      if (file.endsWith('.md')) return true;
-      if (file.includes('tsconfig')) return true;
-      if (file.includes('vite.config')) return true;
-      if (file.includes('tailwind.config')) return true;
-      if (file.includes('postcss.config')) return true;
-      if (file.includes('drizzle.config')) return true;
-      if (file.includes('forge.config')) return true;
-      if (file.startsWith('/.env')) return true;
+      // Include public assets (but exclude generated/uploaded files for smaller package)
+      if (file.startsWith('/public')) {
+        // Exclude user-generated content
+        if (file.includes('/assets/generated/') && !file.endsWith('.gitkeep')) return true;
+        if (file.includes('/assets/uploaded/') && !file.endsWith('.gitkeep')) return true;
+        return false;
+      }
 
-      // Include everything else
-      return false;
+      // Only include native modules that can't be bundled by esbuild
+      if (file.startsWith('/node_modules')) {
+        // Patterns for required native modules (handles both symlinks and .pnpm structure)
+        const requiredPatterns = [
+          // Top-level symlinks
+          /^\/node_modules\/better-sqlite3(\/|$)/,
+          /^\/node_modules\/keytar(\/|$)/,
+          /^\/node_modules\/sharp(\/|$)/,
+          // pnpm actual packages
+          /^\/node_modules\/\.pnpm\/better-sqlite3@/,
+          /^\/node_modules\/\.pnpm\/keytar@/,
+          /^\/node_modules\/\.pnpm\/sharp@/,
+          // Sharp platform-specific bindings
+          /^\/node_modules\/\.pnpm\/@img\+sharp-/,
+          /^\/node_modules\/@img\/sharp-/,
+          // Native module dependencies
+          /^\/node_modules\/\.pnpm\/bindings@/,
+          /^\/node_modules\/\.pnpm\/file-uri-to-path@/,
+          /^\/node_modules\/\.pnpm\/prebuild-install@/,
+          /^\/node_modules\/\.pnpm\/node-addon-api@/,
+          /^\/node_modules\/\.pnpm\/detect-libc@/,
+          /^\/node_modules\/\.pnpm\/node-abi@/,
+          /^\/node_modules\/\.pnpm\/semver@/,
+          /^\/node_modules\/bindings(\/|$)/,
+          /^\/node_modules\/file-uri-to-path(\/|$)/,
+          /^\/node_modules\/prebuild-install(\/|$)/,
+          /^\/node_modules\/node-addon-api(\/|$)/,
+          /^\/node_modules\/detect-libc(\/|$)/,
+          /^\/node_modules\/node-abi(\/|$)/,
+          /^\/node_modules\/semver(\/|$)/,
+          // Sharp dependencies
+          /^\/node_modules\/\.pnpm\/color@/,
+          /^\/node_modules\/\.pnpm\/color-convert@/,
+          /^\/node_modules\/\.pnpm\/color-name@/,
+          /^\/node_modules\/\.pnpm\/color-string@/,
+          /^\/node_modules\/\.pnpm\/simple-swizzle@/,
+          /^\/node_modules\/\.pnpm\/is-arrayish@/,
+          /^\/node_modules\/color(\/|$)/,
+          /^\/node_modules\/color-convert(\/|$)/,
+          /^\/node_modules\/color-name(\/|$)/,
+          /^\/node_modules\/color-string(\/|$)/,
+          /^\/node_modules\/simple-swizzle(\/|$)/,
+          /^\/node_modules\/is-arrayish(\/|$)/,
+        ];
+
+        // Check if this file matches any required pattern
+        for (const pattern of requiredPatterns) {
+          if (pattern.test(file)) return false;
+        }
+
+        // Exclude everything else in node_modules
+        return true;
+      }
+
+      // Exclude everything else (source files, configs, etc.)
+      return true;
     },
-    // Disable pruning - we handle it with ignore
-    prune: false,
+    // Enable pruning to remove devDependencies
+    prune: true,
   },
   rebuildConfig: {},
   makers: [
