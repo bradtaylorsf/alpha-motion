@@ -77,6 +77,15 @@ const config = {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin', 'win32', 'linux'],
     },
+    // macOS DMG
+    {
+      name: '@electron-forge/maker-dmg',
+      platforms: ['darwin'],
+      config: {
+        name: 'Answer Motion',
+        format: 'ULFO',
+      },
+    },
     // Linux DEB
     {
       name: '@electron-forge/maker-deb',
