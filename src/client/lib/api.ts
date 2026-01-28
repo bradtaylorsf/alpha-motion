@@ -241,7 +241,7 @@ export async function removeAssetBackground(
 }
 
 // Pending Ideas API
-import type { AnimationIdea, GenerationSettings, PendingIdea } from '../types';
+import type { GenerationSettings, PendingIdea } from '../types';
 
 export async function createPendingIdea(
   idea: AnimationIdea,

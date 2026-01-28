@@ -82,7 +82,10 @@ export function ExportModal({ componentId, componentName, onClose }: ExportModal
   useEffect(() => {
     const newConfig = CODEC_CONFIGS[codec];
     if (newConfig?.audioCodecs && newConfig.audioCodecs.length > 0) {
-      setAudioCodec(newConfig.audioCodecs[0].value);
+      const firstCodec = newConfig.audioCodecs[0];
+      if (firstCodec) {
+        setAudioCodec(firstCodec.value);
+      }
     }
     if (newConfig?.defaultCrf !== null && newConfig?.defaultCrf !== undefined) {
       setCrf(newConfig.defaultCrf);

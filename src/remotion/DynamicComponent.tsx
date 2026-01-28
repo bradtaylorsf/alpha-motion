@@ -6,7 +6,7 @@ interface DynamicComponentProps {
 
 // This is a placeholder for the Remotion Studio
 // The actual dynamic compilation happens in the browser preview
-export const DynamicComponent: React.FC<DynamicComponentProps> = ({ code }) => {
+export const DynamicComponent: React.FC<DynamicComponentProps> = ({ code: _code }) => {
   return (
     <AbsoluteFill
       style={{

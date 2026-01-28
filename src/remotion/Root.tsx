@@ -6,7 +6,8 @@ export const RemotionRoot: React.FC = () => {
     <>
       <Composition
         id="DynamicComp"
-        component={DynamicComponent}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        component={DynamicComponent as any}
         durationInFrames={150}
         fps={30}
         width={1920}

@@ -62,14 +62,6 @@ function getOutputPathPrefix(): string {
   return '/assets/renders';
 }
 
-// Get a safe working directory for spawning processes (for temp files)
-function getSafeWorkingDir(): string {
-  if (process.env.ELECTRON_DB_PATH) {
-    return path.dirname(process.env.ELECTRON_DB_PATH);
-  }
-  return process.cwd();
-}
-
 // Get the app root directory where node_modules with Remotion is installed
 // This is needed for npx to find the remotion package
 function getAppRootDir(): string {

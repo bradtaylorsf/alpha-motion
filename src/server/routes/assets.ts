@@ -335,7 +335,7 @@ router.post('/:id/edit', async (req, res) => {
     }
 
     const editOptions: EditImageOptions = {
-      sourceImagePath: originalAsset.filePath,
+      sourceImagePath: originalAsset.filePath ?? '',
       editPrompt,
       model,
       aspectRatio,
@@ -395,7 +395,7 @@ router.post('/:id/remove-background', async (req, res) => {
 
     // Remove the background
     const result = await removeBackground(
-      originalAsset.filePath,
+      originalAsset.filePath ?? '',
       originalAsset.promptUsed || 'Unknown',
       {
         model,

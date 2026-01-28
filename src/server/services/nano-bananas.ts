@@ -2,7 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import { v4 as uuid } from 'uuid';
 import fs from 'fs/promises';
 import path from 'path';
-import { extractTransparency, deleteImageByPath } from './background-remover';
+import { extractTransparency, deleteImageByPath as _deleteImageByPath } from './background-remover';
 
 // Get a safe directory for generated assets
 // In Electron, use userData; otherwise use local public folder

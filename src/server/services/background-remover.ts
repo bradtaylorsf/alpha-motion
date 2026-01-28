@@ -83,13 +83,13 @@ export async function extractTransparency(
     const dstIdx = i * 4;
 
     // Get pixel values (0-255)
-    const whiteR = whiteData[srcIdx];
-    const whiteG = whiteData[srcIdx + 1];
-    const whiteB = whiteData[srcIdx + 2];
+    const whiteR = whiteData[srcIdx] ?? 0;
+    const whiteG = whiteData[srcIdx + 1] ?? 0;
+    const whiteB = whiteData[srcIdx + 2] ?? 0;
 
-    const blackR = blackData[srcIdx];
-    const blackG = blackData[srcIdx + 1];
-    const blackB = blackData[srcIdx + 2];
+    const blackR = blackData[srcIdx] ?? 0;
+    const blackG = blackData[srcIdx + 1] ?? 0;
+    const blackB = blackData[srcIdx + 2] ?? 0;
 
     // Calculate alpha using difference matting
     // On white background: pixel = fg * alpha + white * (1 - alpha) = fg * alpha + 255 * (1 - alpha)

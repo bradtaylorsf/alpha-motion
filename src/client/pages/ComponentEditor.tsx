@@ -260,7 +260,7 @@ export function ComponentEditor() {
 
       {/* Main content */}
       <div className="flex-1 min-h-0">
-        <PanelGroup direction="horizontal">
+        <PanelGroup orientation="horizontal">
           {/* Left panel with tabs */}
           <Panel defaultSize={50} minSize={30}>
             <div className="h-full flex flex-col">
