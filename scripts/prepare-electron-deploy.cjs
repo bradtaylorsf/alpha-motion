@@ -4,8 +4,14 @@ const fs = require('fs');
 
 const projectDir = process.cwd();
 const deployDir = path.join(projectDir, 'electron-deploy');
+const releaseDir = path.join(projectDir, 'release');
 
-console.log('Creating deployment directory...');
+console.log('Cleaning build directories...');
+
+// Clean release directory to avoid hardlink conflicts
+if (fs.existsSync(releaseDir)) {
+  fs.rmSync(releaseDir, { recursive: true });
+}
 
 // Clean and create deploy directory
 if (fs.existsSync(deployDir)) {
