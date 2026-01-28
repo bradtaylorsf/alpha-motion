@@ -82,6 +82,8 @@ const config = {
       name: '@electron-forge/maker-squirrel',
       config: {
         name: 'AnswerMotion',
+        authors: 'Answer AI',
+        description: 'AI-powered motion design tool',
       },
     },
     // Linux DEB
@@ -91,8 +93,10 @@ const config = {
         options: {
           name: 'answer-motion',
           productName: 'Answer Motion',
-          maintainer: 'Answer Motion',
-          homepage: 'https://github.com/bradtaylorsf/remotion-moodboard',
+          description: 'AI-powered motion design tool',
+          productDescription: 'AI-powered motion design tool for generating, previewing, and organizing Remotion animation components',
+          maintainer: 'Answer AI <hello@answerai.com>',
+          homepage: 'https://github.com/the-answerai/answer-motion',
           icon: path.resolve(__dirname, 'build-resources/icon.png'),
           categories: ['Development'],
         },
@@ -105,6 +109,8 @@ const config = {
         options: {
           name: 'answer-motion',
           productName: 'Answer Motion',
+          description: 'AI-powered motion design tool',
+          productDescription: 'AI-powered motion design tool for generating, previewing, and organizing Remotion animation components',
           icon: path.resolve(__dirname, 'build-resources/icon.png'),
           categories: ['Development'],
         },

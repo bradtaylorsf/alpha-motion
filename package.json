@@ -1,6 +1,9 @@
 {
   "name": "answer-motion",
-  "version": "0.3.0",
+  "version": "0.3.1",
+  "description": "AI-powered motion design tool for generating, previewing, and organizing Remotion animation components",
+  "author": "Answer AI <hello@answerai.com>",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "engines": {
