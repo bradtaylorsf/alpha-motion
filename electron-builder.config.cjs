@@ -11,7 +11,7 @@ const config = {
   },
   files: [
     '**/*',
-    // Exclude @remotion/bundler entirely - it's for build-time only
+    // Exclude build-time only packages
     '!**/node_modules/@remotion/bundler/**/*',
     // Exclude source maps and unnecessary files
     '!**/*.map',
@@ -19,8 +19,17 @@ const config = {
     '!**/LICENSE*',
     '!**/CHANGELOG*',
   ],
-  // Disable asar to simplify packaging
-  asar: false,
+  // Use asar with unpacking for native modules to avoid hardlink issues
+  asar: true,
+  asarUnpack: [
+    '**/node_modules/better-sqlite3/**/*',
+    '**/node_modules/keytar/**/*',
+    '**/node_modules/sharp/**/*',
+    '**/node_modules/@remotion/compositor-*/**/*',
+    '**/*.node',
+    '**/ffmpeg',
+    '**/ffprobe',
+  ],
   npmRebuild: true,
   nodeGypRebuild: false,
     // Artifact naming for cleaner release files
