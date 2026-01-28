@@ -82,7 +82,6 @@ const config = {
       name: '@electron-forge/maker-dmg',
       platforms: ['darwin'],
       config: {
-        name: 'Answer Motion',
         format: 'ULFO',
       },
     },
