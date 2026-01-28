@@ -1,6 +1,6 @@
 {
   "name": "answer-motion",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "AI-powered motion design tool for generating, previewing, and organizing Remotion animation components",
   "author": "Answer AI <hello@answerai.com>",
   "license": "MIT",
@@ -14,7 +14,9 @@
       "better-sqlite3",
       "esbuild",
       "electron",
-      "keytar"
+      "keytar",
+      "macos-alias",
+      "fs-xattr"
     ]
   },
   "main": "electron-dist/main.cjs",

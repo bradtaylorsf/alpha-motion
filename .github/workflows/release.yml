@@ -105,6 +105,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      # macOS specific: Rebuild native modules for DMG creation
+      - name: Rebuild native modules for DMG
+        if: matrix.platform == 'darwin'
+        run: |
+          pnpm rebuild macos-alias fs-xattr || true
+
       # Linux specific: Install build dependencies
       - name: Install Linux dependencies
         if: matrix.platform == 'linux'
