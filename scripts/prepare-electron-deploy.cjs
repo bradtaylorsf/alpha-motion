@@ -32,23 +32,31 @@ execSync('npm install --omit=dev --legacy-peer-deps', {
   stdio: 'inherit',
 });
 
-// Break hardlinks in node_modules to avoid EEXIST errors in electron-builder
+// Break hardlinks by copying with rsync (which breaks hardlinks by default)
 // This is needed because npm creates hardlinks for duplicate files
 console.log('Breaking hardlinks in node_modules...');
 const nodeModulesDir = path.join(deployDir, 'node_modules');
 const tempDir = path.join(deployDir, 'node_modules_temp');
 if (fs.existsSync(nodeModulesDir)) {
-  // Use platform-specific command to copy with dereferencing
   const isWindows = process.platform === 'win32';
   if (isWindows) {
-    // On Windows, xcopy /E /I copies without preserving hardlinks
-    execSync(`xcopy "${nodeModulesDir}" "${tempDir}" /E /I /H /Y`, { stdio: 'inherit' });
+    // On Windows, robocopy breaks hardlinks by default
+    // /E = copy subdirs including empty, /MOVE = move files, /NFL /NDL /NJH /NJS = quiet output
+    execSync(`robocopy "${nodeModulesDir}" "${tempDir}" /E /MOVE /NFL /NDL /NJH /NJS`, {
+      stdio: 'inherit',
+      // robocopy returns non-zero on success, so we ignore errors < 8
+    });
+    // robocopy moves, so nodeModulesDir should be empty or gone
+    if (fs.existsSync(nodeModulesDir)) {
+      fs.rmSync(nodeModulesDir, { recursive: true });
+    }
+    fs.renameSync(tempDir, nodeModulesDir);
   } else {
-    // On Unix, cp -rL dereferences symlinks and hardlinks
-    execSync(`cp -rL "${nodeModulesDir}" "${tempDir}"`, { stdio: 'inherit' });
+    // On Unix, use rsync which breaks hardlinks by default
+    execSync(`rsync -a --delete "${nodeModulesDir}/" "${tempDir}/"`, { stdio: 'inherit' });
+    fs.rmSync(nodeModulesDir, { recursive: true });
+    fs.renameSync(tempDir, nodeModulesDir);
   }
-  fs.rmSync(nodeModulesDir, { recursive: true });
-  fs.renameSync(tempDir, nodeModulesDir);
 }
 
 // Copy built files to deploy directory
