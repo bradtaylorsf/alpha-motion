@@ -10,7 +10,13 @@ const config = {
     app: 'electron-deploy',
   },
   files: ['**/*'],
-  asar: false,
+  asar: true,
+  asarUnpack: [
+    '**/node_modules/better-sqlite3/**/*',
+    '**/node_modules/keytar/**/*',
+    '**/node_modules/sharp/**/*',
+    '**/*.node',
+  ],
   npmRebuild: true,
   nodeGypRebuild: false,
     // Artifact naming for cleaner release files
