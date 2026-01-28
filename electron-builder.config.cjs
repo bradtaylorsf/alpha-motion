@@ -19,17 +19,8 @@ const config = {
     '!**/LICENSE*',
     '!**/CHANGELOG*',
   ],
-  // Use asar with unpacking for native modules to avoid hardlink issues
-  asar: true,
-  asarUnpack: [
-    '**/node_modules/better-sqlite3/**/*',
-    '**/node_modules/keytar/**/*',
-    '**/node_modules/sharp/**/*',
-    '**/node_modules/@remotion/compositor-*/**/*',
-    '**/*.node',
-    '**/ffmpeg',
-    '**/ffprobe',
-  ],
+  // Disable asar packaging - use raw files to avoid hardlink conflicts
+  asar: false,
   npmRebuild: true,
   nodeGypRebuild: false,
     // Artifact naming for cleaner release files

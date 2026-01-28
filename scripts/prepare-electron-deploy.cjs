@@ -5,6 +5,7 @@ const fs = require('fs');
 const projectDir = process.cwd();
 const deployDir = path.join(projectDir, 'electron-deploy');
 const releaseDir = path.join(projectDir, 'release');
+const isWindows = process.platform === 'win32';
 
 console.log('Cleaning build directories...');
 
@@ -25,8 +26,7 @@ fs.copyFileSync(
   path.join(deployDir, 'package.json')
 );
 
-// Use npm on Mac/Linux to avoid hardlink issues, pnpm on Windows
-const isWindows = process.platform === 'win32';
+// Install production dependencies
 if (isWindows) {
   console.log('Installing production dependencies with pnpm (Windows)...');
   execSync('pnpm install --prod --shamefully-hoist --node-linker=hoisted', {
@@ -40,8 +40,10 @@ if (isWindows) {
     stdio: 'inherit',
   });
 
-  // Break hardlinks on Mac/Linux by re-copying files through Node.js
-  console.log('Breaking hardlinks in node_modules (Mac/Linux)...');
+  // Break hardlinks on Mac/Linux to avoid electron-builder EEXIST errors
+  // electron-builder's FileCopier tries to create hardlinks for identical files,
+  // which fails when the destination already exists
+  console.log('Breaking hardlinks in node_modules...');
   const nodeModulesDir = path.join(deployDir, 'node_modules');
   const tempDir = path.join(deployDir, 'node_modules_tmp');
 
@@ -56,7 +58,8 @@ if (isWindows) {
         const target = fs.readlinkSync(srcPath);
         fs.symlinkSync(target, destPath);
       } else {
-        fs.copyFileSync(srcPath, destPath);
+        // Read and write file content to break hardlinks
+        fs.writeFileSync(destPath, fs.readFileSync(srcPath));
         try { fs.chmodSync(destPath, fs.statSync(srcPath).mode); } catch {}
       }
     }
@@ -67,45 +70,6 @@ if (isWindows) {
   fs.renameSync(tempDir, nodeModulesDir);
   console.log('Hardlinks broken');
 }
-
-// Break all hardlinks by copying files through Node.js
-// This is necessary because electron-builder's FileCopier fails on hardlinked files
-console.log('Breaking hardlinks in node_modules...');
-function copyDirBreakHardlinks(src, dest) {
-  if (!fs.existsSync(dest)) {
-    fs.mkdirSync(dest, { recursive: true });
-  }
-  const entries = fs.readdirSync(src, { withFileTypes: true });
-  for (const entry of entries) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      copyDirBreakHardlinks(srcPath, destPath);
-    } else if (entry.isSymbolicLink()) {
-      // Preserve symlinks as-is
-      const target = fs.readlinkSync(srcPath);
-      if (!fs.existsSync(destPath)) {
-        fs.symlinkSync(target, destPath);
-      }
-    } else {
-      // Copy file content (breaks hardlinks)
-      const content = fs.readFileSync(srcPath);
-      fs.writeFileSync(destPath, content);
-      // Preserve permissions
-      const stat = fs.statSync(srcPath);
-      fs.chmodSync(destPath, stat.mode);
-    }
-  }
-}
-
-const nodeModulesDir = path.join(deployDir, 'node_modules');
-const tempDir = path.join(deployDir, 'node_modules_temp');
-if (fs.existsSync(nodeModulesDir)) {
-  copyDirBreakHardlinks(nodeModulesDir, tempDir);
-  fs.rmSync(nodeModulesDir, { recursive: true });
-  fs.renameSync(tempDir, nodeModulesDir);
-}
-console.log('Hardlinks broken successfully');
 
 // Copy built files to deploy directory
 console.log('Copying built files...');
