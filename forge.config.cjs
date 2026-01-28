@@ -20,12 +20,8 @@ const config = {
     // macOS specific
     appBundleId: 'com.answer.motion',
     appCategoryType: 'public.app-category.developer-tools',
-    // Ad-hoc signing makes the app openable without "damaged" errors
-    // Users still need to right-click → Open the first time
-    osxSign: {
-      identity: '-', // Ad-hoc signing (no Apple Developer account needed)
-      identityValidation: false,
-    },
+    // Disable signing - we'll handle it in a post-package hook
+    osxSign: false,
     osxNotarize: false,
     // Use asar for smaller package size and faster loading
     // Native modules must be unpacked from asar to work properly
@@ -199,6 +195,43 @@ const config = {
       }
 
       console.log('Build files verified');
+    },
+    // Sign the app with ad-hoc signature after packaging (macOS only)
+    postPackage: async (forgeConfig, options) => {
+      if (options.platform !== 'darwin') return;
+
+      const { execSync } = require('child_process');
+      const fs = require('fs');
+      const path = require('path');
+
+      // Find the .app bundle in the output directory
+      const outputDir = options.outputPaths[0];
+      const files = fs.readdirSync(outputDir);
+      const appBundle = files.find(f => f.endsWith('.app'));
+
+      if (!appBundle) {
+        console.log('No .app bundle found, skipping signing');
+        return;
+      }
+
+      const appPath = path.join(outputDir, appBundle);
+      console.log(`Ad-hoc signing ${appPath}...`);
+
+      try {
+        // Remove any existing signatures first
+        execSync(`codesign --remove-signature "${appPath}" 2>/dev/null || true`, { stdio: 'inherit' });
+
+        // Sign with ad-hoc identity, deep signing all nested code
+        execSync(`codesign --force --deep --sign - "${appPath}"`, { stdio: 'inherit' });
+
+        // Verify the signature
+        execSync(`codesign --verify --deep --strict "${appPath}"`, { stdio: 'inherit' });
+
+        console.log('Ad-hoc signing complete');
+      } catch (error) {
+        console.error('Signing failed:', error.message);
+        // Don't fail the build - unsigned apps can still work with xattr
+      }
     },
   },
 };
