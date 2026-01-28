@@ -58,7 +58,9 @@ const config = {
 
     console.log('Deployment directory ready');
   },
-    mac: {
+    // Artifact naming for cleaner release files
+  artifactName: '${productName}-${version}-${os}-${arch}.${ext}',
+  mac: {
     category: 'public.app-category.developer-tools',
     target: [
       { target: 'dmg', arch: ['x64', 'arm64'] },
@@ -68,12 +70,22 @@ const config = {
     gatekeeperAssess: false,
     entitlements: 'build-resources/entitlements.mac.plist',
     entitlementsInherit: 'build-resources/entitlements.mac.plist',
+    artifactName: '${productName}-${version}-mac-${arch}.${ext}',
+  },
+  dmg: {
+    artifactName: '${productName}-${version}-mac-${arch}.${ext}',
   },
   win: {
     target: [
       { target: 'nsis', arch: ['x64'] },
       { target: 'zip', arch: ['x64'] },
     ],
+    artifactName: '${productName}-${version}-win-${arch}.${ext}',
+  },
+  nsis: {
+    oneClick: false,
+    allowToChangeInstallationDirectory: true,
+    artifactName: '${productName}-Setup-${version}.${ext}',
   },
   linux: {
     target: [
@@ -81,14 +93,11 @@ const config = {
       { target: 'deb', arch: ['x64'] },
     ],
     category: 'Development',
-  },
-  nsis: {
-    oneClick: false,
-    allowToChangeInstallationDirectory: true,
+    artifactName: '${productName}-${version}-linux-${arch}.${ext}',
   },
   publish: {
     provider: 'github',
-    releaseType: 'draft',
+    releaseType: 'release',
   },
 };
 
