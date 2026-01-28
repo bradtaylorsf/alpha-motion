@@ -1,6 +1,6 @@
-# Remotion Moodboard - Claude Code Instructions
+# Answer Motion - Claude Code Instructions
 
-This project is an AI-powered mood board for generating, previewing, and organizing Remotion animation components.
+This project is an AI-powered motion design tool for generating, previewing, and organizing Remotion animation components.
 
 ## Project Overview
 

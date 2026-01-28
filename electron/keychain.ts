@@ -1,6 +1,6 @@
 import keytar from 'keytar';
 
-const SERVICE_NAME = 'RemotionMoodboard';
+const SERVICE_NAME = 'AnswerMotion';
 
 // Key names for storing credentials
 export const KEY_NAMES = {

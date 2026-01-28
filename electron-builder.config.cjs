@@ -6,8 +6,8 @@ const fs = require('fs');
  * @type {import('electron-builder').Configuration}
  */
 const config = {
-  appId: 'com.remotion.moodboard',
-  productName: 'Remotion Moodboard',
+  appId: 'com.answer.motion',
+  productName: 'Answer Motion',
   directories: {
     buildResources: 'build-resources',
     output: 'release',

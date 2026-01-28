@@ -24,7 +24,7 @@ export function createMainWindow(options: WindowOptions): BrowserWindow {
     height: 900,
     minWidth: 1024,
     minHeight: 768,
-    title: 'Remotion Moodboard',
+    title: 'Answer Motion',
     backgroundColor: '#0a0a0a',
     webPreferences: {
       preload: preloadPath,

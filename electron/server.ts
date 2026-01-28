@@ -8,7 +8,7 @@ let server: http.Server | null = null;
 // Dynamic import to handle ESM modules
 async function importApp(): Promise<Express.Application> {
   // Set environment variables for Electron before importing
-  const dbPath = path.join(app.getPath('userData'), 'moodboard.db');
+  const dbPath = path.join(app.getPath('userData'), 'answer-motion.db');
   process.env.ELECTRON_DB_PATH = dbPath;
   process.env.NODE_ENV = 'production';
 

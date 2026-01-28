@@ -22,7 +22,7 @@ function getDatabasePath(): string {
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
-  return path.resolve(dataDir, 'moodboard.db');
+  return path.resolve(dataDir, 'answer-motion.db');
 }
 
 const dbPath = getDatabasePath();

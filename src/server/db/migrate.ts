@@ -8,7 +8,7 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-const dbPath = path.resolve(dataDir, 'moodboard.db');
+const dbPath = path.resolve(dataDir, 'answer-motion.db');
 const db = new Database(dbPath);
 
 // Create tables

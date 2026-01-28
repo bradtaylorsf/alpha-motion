@@ -33,7 +33,7 @@ export function Header({ showBackButton, title, subtitle, actions }: HeaderProps
           </>
         ) : (
           <Link to="/" className="flex items-center">
-            <img src="/logo-dark.png" alt="Answera" className="h-8" />
+            <img src="/logo-dark.png" alt="AnswerAI" className="h-8" />
           </Link>
         )}
       </div>
@@ -95,25 +95,8 @@ export function Header({ showBackButton, title, subtitle, actions }: HeaderProps
               </svg>
             </Link>
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <svg
-                  className="h-5 w-5 text-primary-foreground"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-                  />
-                </svg>
-              </div>
-              <div>
-                <h1 className="text-base font-bold text-foreground">Remotion Moodboard</h1>
-                <p className="text-xs text-muted-foreground">AI-powered animation ideas</p>
-              </div>
+              <img src="/answer-motion-logo.png" alt="Answer Motion" className="h-8 w-8" />
+              <span className="text-lg font-bold text-foreground">Motion</span>
             </div>
           </>
         )}

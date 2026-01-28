@@ -1,6 +1,6 @@
-# Remotion Moodboard
+# Answer Motion
 
-An AI-powered mood board for generating, previewing, and organizing Remotion animation components.
+An AI-powered motion design tool for generating, previewing, and organizing Remotion animation components.
 
 ## Features
 
@@ -32,8 +32,8 @@ An AI-powered mood board for generating, previewing, and organizing Remotion ani
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/the-answerai/remotion-moodboard.git
-   cd remotion-moodboard
+   git clone https://github.com/the-answerai/answer-motion.git
+   cd answer-motion
    ```
 
 2. Install dependencies:
