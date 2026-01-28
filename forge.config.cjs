@@ -20,7 +20,12 @@ const config = {
     // macOS specific
     appBundleId: 'com.answer.motion',
     appCategoryType: 'public.app-category.developer-tools',
-    osxSign: false, // Disable signing for now
+    // Ad-hoc signing makes the app openable without "damaged" errors
+    // Users still need to right-click → Open the first time
+    osxSign: {
+      identity: '-', // Ad-hoc signing (no Apple Developer account needed)
+      identityValidation: false,
+    },
     osxNotarize: false,
     // Use asar for smaller package size and faster loading
     // Native modules must be unpacked from asar to work properly
