@@ -52,7 +52,7 @@ interface IdeaEditModalProps {
 export function IdeaEditModal({
   pendingIdea,
   onClose,
-  onUpdate,
+  onUpdate: _onUpdate,
   onGenerate,
   onAssetGenerated,
   onAssetDeleted,

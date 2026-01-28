@@ -141,15 +141,9 @@ jobs:
       - name: Build Electron app
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS signing (only set if secret exists)
-          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE || '' }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD || '' }}
-          # macOS notarization (optional)
-          APPLE_ID: ${{ secrets.APPLE_ID || '' }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID || '' }}
-          # Disable code signing if no certificate
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          # Disable all code signing auto-discovery
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          WIN_CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
           pnpm run dist:${{ matrix.platform }}
 

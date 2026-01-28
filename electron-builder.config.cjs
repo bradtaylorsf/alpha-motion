@@ -11,9 +11,8 @@ const config = {
   },
   files: [
     '**/*',
-    // Exclude files that cause duplicate hardlink issues
-    '!**/node_modules/@remotion/bundler/favicon.ico',
-    '!**/node_modules/@remotion/bundler/react-shim.js',
+    // Exclude @remotion/bundler entirely - it's for build-time only
+    '!**/node_modules/@remotion/bundler/**/*',
     // Exclude source maps and unnecessary files
     '!**/*.map',
     '!**/*.md',

@@ -21,7 +21,7 @@ const RESOLUTION_PRESETS = [
 export function SettingsTab({ durationFrames, fps, width, height, onChange }: SettingsTabProps) {
   const currentPreset = RESOLUTION_PRESETS.find(
     (p) => p.width === width && p.height === height
-  ) || RESOLUTION_PRESETS[RESOLUTION_PRESETS.length - 1];
+  ) ?? RESOLUTION_PRESETS[RESOLUTION_PRESETS.length - 1];
 
   const durationSeconds = durationFrames / fps;
 
@@ -60,7 +60,7 @@ export function SettingsTab({ durationFrames, fps, width, height, onChange }: Se
       <div className="space-y-1.5 col-span-2">
         <label className="text-sm font-medium text-foreground">Resolution</label>
         <select
-          value={currentPreset.label}
+          value={currentPreset?.label ?? 'Custom'}
           onChange={(e) => {
             const preset = RESOLUTION_PRESETS.find((p) => p.label === e.target.value);
             if (preset && preset.width > 0) {
@@ -78,7 +78,7 @@ export function SettingsTab({ durationFrames, fps, width, height, onChange }: Se
       </div>
 
       {/* Custom width/height */}
-      {currentPreset.width === 0 && (
+      {currentPreset?.width === 0 && (
         <>
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-foreground">Width</label>

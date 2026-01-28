@@ -59,7 +59,7 @@ export function AssetGenerator({
   suggestedAssets = [],
   generating,
   onGenerate,
-  onGenerateBatch,
+  onGenerateBatch: _onGenerateBatch,
   className,
   initialPrompt,
   onInitialPromptUsed,

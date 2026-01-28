@@ -66,7 +66,7 @@ interface ExportTabProps {
   componentName: string;
 }
 
-export function ExportTab({ componentId, componentName }: ExportTabProps) {
+export function ExportTab({ componentId, componentName: _componentName }: ExportTabProps) {
   const [codec, setCodec] = useState<VideoCodec>('h264');
   const [crf, setCrf] = useState<number>(18);
   const [audioCodec, setAudioCodec] = useState<AudioCodec>('aac');
@@ -78,10 +78,10 @@ export function ExportTab({ componentId, componentName }: ExportTabProps) {
 
   useEffect(() => {
     const newConfig = CODEC_CONFIGS[codec];
-    if (newConfig.audioCodecs.length > 0) {
+    if (newConfig?.audioCodecs && newConfig.audioCodecs.length > 0) {
       setAudioCodec(newConfig.audioCodecs[0].value);
     }
-    if (newConfig.defaultCrf !== null) {
+    if (newConfig?.defaultCrf !== null && newConfig?.defaultCrf !== undefined) {
       setCrf(newConfig.defaultCrf);
     }
   }, [codec]);

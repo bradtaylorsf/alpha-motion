@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useExport } from '../../hooks/useExport';
 import type { VideoCodec, AudioCodec, ProResProfile, ExportOptions } from '../../types';
-import { cn } from '../../lib/utils';
 
 // Codec configuration (mirrored from shared config)
 const CODEC_CONFIGS: Record<VideoCodec, {
@@ -75,17 +74,17 @@ export function ExportModal({ componentId, componentName, onClose }: ExportModal
   const [audioCodec, setAudioCodec] = useState<AudioCodec>('aac');
   const [proresProfile, setProresProfile] = useState<ProResProfile>('standard');
 
-  const { status, progress, outputPath, downloadUrl, error, isExporting, startExport, reset } = useExport();
+  const { status, progress, downloadUrl, error, isExporting, startExport, reset } = useExport();
 
   const config = CODEC_CONFIGS[codec];
 
   // Update audio codec when video codec changes
   useEffect(() => {
     const newConfig = CODEC_CONFIGS[codec];
-    if (newConfig.audioCodecs.length > 0) {
+    if (newConfig?.audioCodecs && newConfig.audioCodecs.length > 0) {
       setAudioCodec(newConfig.audioCodecs[0].value);
     }
-    if (newConfig.defaultCrf !== null) {
+    if (newConfig?.defaultCrf !== null && newConfig?.defaultCrf !== undefined) {
       setCrf(newConfig.defaultCrf);
     }
   }, [codec]);

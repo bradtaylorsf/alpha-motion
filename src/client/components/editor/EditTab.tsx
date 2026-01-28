@@ -12,7 +12,7 @@ interface EditTabProps {
 }
 
 export function EditTab({
-  componentId,
+  componentId: _componentId,
   assets,
   isEditing,
   isRemixing,
