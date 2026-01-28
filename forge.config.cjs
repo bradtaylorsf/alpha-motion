@@ -72,19 +72,10 @@ const config = {
   },
   rebuildConfig: {},
   makers: [
-    // ZIP for all platforms (no native deps, most reliable)
+    // ZIP for all platforms (most reliable, avoids Windows path length issues)
     {
       name: '@electron-forge/maker-zip',
       platforms: ['darwin', 'win32', 'linux'],
-    },
-    // Windows - Squirrel installer
-    {
-      name: '@electron-forge/maker-squirrel',
-      config: {
-        name: 'AnswerMotion',
-        authors: 'Answer AI',
-        description: 'AI-powered motion design tool',
-      },
     },
     // Linux DEB
     {
