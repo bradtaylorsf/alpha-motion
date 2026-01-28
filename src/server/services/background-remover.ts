@@ -3,7 +3,16 @@ import { v4 as uuid } from 'uuid';
 import fs from 'fs/promises';
 import path from 'path';
 
-const GENERATED_ASSETS_DIR = path.resolve(process.cwd(), 'public/assets/generated');
+// Get a safe directory for generated assets
+function getGeneratedAssetsDir(): string {
+  if (process.env.ELECTRON_DB_PATH) {
+    const userDataDir = path.dirname(process.env.ELECTRON_DB_PATH);
+    return path.join(userDataDir, 'generated');
+  }
+  return path.resolve(process.cwd(), 'public/assets/generated');
+}
+
+const GENERATED_ASSETS_DIR = getGeneratedAssetsDir();
 
 async function ensureDirectory(dir: string): Promise<void> {
   try {
@@ -33,12 +42,23 @@ export async function extractTransparency(
   outputId?: string
 ): Promise<{ id: string; filePath: string; absolutePath: string }> {
   // Convert relative paths to absolute if needed
-  const absoluteWhitePath = whiteBackgroundPath.startsWith('/')
-    ? path.join(process.cwd(), 'public', whiteBackgroundPath)
-    : whiteBackgroundPath;
-  const absoluteBlackPath = blackBackgroundPath.startsWith('/')
-    ? path.join(process.cwd(), 'public', blackBackgroundPath)
-    : blackBackgroundPath;
+  function resolveImagePath(relativePath: string): string {
+    if (!relativePath.startsWith('/')) {
+      return relativePath;
+    }
+    if (process.env.ELECTRON_DB_PATH) {
+      const userDataDir = path.dirname(process.env.ELECTRON_DB_PATH);
+      const filename = path.basename(relativePath);
+      if (relativePath.includes('/uploaded/')) {
+        return path.join(userDataDir, 'uploads', filename);
+      }
+      return path.join(userDataDir, 'generated', filename);
+    }
+    return path.join(process.cwd(), 'public', relativePath);
+  }
+
+  const absoluteWhitePath = resolveImagePath(whiteBackgroundPath);
+  const absoluteBlackPath = resolveImagePath(blackBackgroundPath);
 
   // Load both images
   const [whiteImage, blackImage] = await Promise.all([
@@ -135,7 +155,18 @@ export async function extractTransparency(
  */
 export async function deleteImageByPath(filePath: string): Promise<boolean> {
   try {
-    const absolutePath = path.join(process.cwd(), 'public', filePath);
+    let absolutePath: string;
+    if (process.env.ELECTRON_DB_PATH) {
+      const userDataDir = path.dirname(process.env.ELECTRON_DB_PATH);
+      const filename = path.basename(filePath);
+      if (filePath.includes('/uploaded/')) {
+        absolutePath = path.join(userDataDir, 'uploads', filename);
+      } else {
+        absolutePath = path.join(userDataDir, 'generated', filename);
+      }
+    } else {
+      absolutePath = path.join(process.cwd(), 'public', filePath);
+    }
     await fs.unlink(absolutePath);
     return true;
   } catch (error) {

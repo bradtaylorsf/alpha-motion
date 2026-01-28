@@ -1,6 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-const client = new Anthropic();
+// Create client with optional API key override
+// In Electron, this may be called with a key from the system keychain
+function createClient(apiKey?: string): Anthropic {
+  return new Anthropic({
+    apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
+  });
+}
+
+// Default client for backwards compatibility
+const client = createClient();
 
 export interface AnimationIdea {
   title: string;
@@ -75,10 +84,11 @@ Return ONLY a valid JSON object (no markdown, no code blocks) with this exact st
 
 User's idea:`;
 
-export async function generateRandomIdea(category?: string): Promise<AnimationIdea> {
+export async function generateRandomIdea(category?: string, apiKey?: string): Promise<AnimationIdea> {
   const selectedCategory = category || ANIMATION_CATEGORIES[Math.floor(Math.random() * ANIMATION_CATEGORIES.length)];
+  const anthropicClient = apiKey ? createClient(apiKey) : client;
 
-  const message = await client.messages.create({
+  const message = await anthropicClient.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
     messages: [
@@ -106,8 +116,10 @@ export async function generateRandomIdea(category?: string): Promise<AnimationId
   }
 }
 
-export async function expandIdea(userIdea: string): Promise<AnimationIdea> {
-  const message = await client.messages.create({
+export async function expandIdea(userIdea: string, apiKey?: string): Promise<AnimationIdea> {
+  const anthropicClient = apiKey ? createClient(apiKey) : client;
+
+  const message = await anthropicClient.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 1024,
     messages: [

@@ -1,6 +1,17 @@
 import { spawn } from 'child_process';
 import { v4 as uuid } from 'uuid';
+import os from 'os';
+import path from 'path';
 import type { AnimationIdea } from './anthropic';
+
+// Get a safe working directory for spawning processes
+function getSafeWorkingDir(): string {
+  // In Electron, use the userData directory; otherwise use temp
+  if (process.env.ELECTRON_DB_PATH) {
+    return path.dirname(process.env.ELECTRON_DB_PATH);
+  }
+  return os.tmpdir();
+}
 
 export interface AssetInfo {
   url: string;
@@ -141,14 +152,15 @@ async function runGeneration(jobId: string): Promise<void> {
 
   const prompt = buildComponentPrompt(job.idea, job.options);
 
-  const claudePath = process.env.CLAUDE_PATH || '/Users/bradtaylor/.local/bin/claude';
+  const claudePath = process.env.CLAUDE_PATH || 'claude';
   console.log(`[Generation ${jobId}] Starting generation for: ${job.idea.title}`);
   console.log(`[Generation ${jobId}] Running claude CLI at: ${claudePath}`);
 
   return new Promise<void>((resolve) => {
     // Use full path to claude CLI and bash to ensure proper environment
+    // Use a safe working directory to avoid macOS permission prompts
     const claude = spawn('/bin/bash', ['-c', `"${claudePath}" --print --output-format text`], {
-      cwd: process.cwd(),
+      cwd: getSafeWorkingDir(),
       env: { ...process.env },
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -291,13 +303,14 @@ async function runEditGeneration(jobId: string, currentCode: string, assets?: As
 
   const prompt = buildEditPrompt(currentCode, job.instructions, assets);
 
-  const claudePath = process.env.CLAUDE_PATH || '/Users/bradtaylor/.local/bin/claude';
+  const claudePath = process.env.CLAUDE_PATH || 'claude';
   console.log(`[Edit ${jobId}] Starting ${job.type} for component: ${job.componentId}`);
   console.log(`[Edit ${jobId}] Running claude CLI at: ${claudePath}`);
 
   return new Promise<void>((resolve) => {
+    // Use a safe working directory to avoid macOS permission prompts
     const claude = spawn('/bin/bash', ['-c', `"${claudePath}" --print --output-format text`], {
-      cwd: process.cwd(),
+      cwd: getSafeWorkingDir(),
       env: { ...process.env },
       stdio: ['pipe', 'pipe', 'pipe'],
     });

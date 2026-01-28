@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { UnifiedBoard } from './components/UnifiedBoard';
 import { ComponentEditor } from './pages/ComponentEditor';
+import { Settings } from './pages/Settings';
 import { Header } from './components/layout/Header';
 
 function BoardPage() {
@@ -22,6 +23,7 @@ export function App() {
     <Routes>
       <Route path="/" element={<BoardPage />} />
       <Route path="/component/:id" element={<ComponentEditor />} />
+      <Route path="/settings" element={<Settings />} />
     </Routes>
   );
 }

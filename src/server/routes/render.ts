@@ -138,8 +138,16 @@ router.get('/:jobId/download', async (req, res) => {
 
     // Convert relative URL path to absolute file path
     // outputPath is like "/assets/renders/uuid.mp4"
-    const relativePath = job.outputPath.replace(/^\//, ''); // Remove leading slash
-    const filePath = path.resolve(process.cwd(), 'public', relativePath);
+    let filePath: string;
+    if (process.env.ELECTRON_DB_PATH) {
+      // In Electron, renders are stored in userData directory
+      const userDataDir = path.dirname(process.env.ELECTRON_DB_PATH);
+      const filename = path.basename(job.outputPath);
+      filePath = path.join(userDataDir, 'renders', filename);
+    } else {
+      const relativePath = job.outputPath.replace(/^\//, ''); // Remove leading slash
+      filePath = path.resolve(process.cwd(), 'public', relativePath);
+    }
 
     // Check if file exists
     if (!fs.existsSync(filePath)) {

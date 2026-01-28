@@ -25,7 +25,18 @@ import {
 const router = Router();
 
 // Configure multer for file uploads
-const UPLOADS_DIR = path.join(process.cwd(), 'public', 'assets', 'uploaded');
+// In Electron, use userData directory; otherwise use local public folder
+function getUploadsDir(): string {
+  if (process.env.ELECTRON_DB_PATH) {
+    // In Electron, store uploads in userData directory (same place as DB)
+    const userDataDir = path.dirname(process.env.ELECTRON_DB_PATH);
+    return path.join(userDataDir, 'uploads');
+  }
+  // Development: use local public folder
+  return path.join(process.cwd(), 'public', 'assets', 'uploaded');
+}
+
+const UPLOADS_DIR = getUploadsDir();
 
 // Ensure uploads directory exists
 if (!fs.existsSync(UPLOADS_DIR)) {

@@ -2,6 +2,7 @@ import { spawn } from 'child_process';
 import { v4 as uuid } from 'uuid';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import * as os from 'os';
 import {
   type ExportOptions,
   getExtension,
@@ -32,9 +33,90 @@ export interface RenderJob {
 
 const jobs = new Map<string, RenderJob>();
 
-const TEMP_DIR = path.resolve(process.cwd(), '.remotion-render');
-const OUTPUT_DIR = path.resolve(process.cwd(), 'public/assets/renders');
-const PUBLIC_DIR = path.resolve(process.cwd(), 'public');
+// Get directories based on environment (Electron vs development)
+function getTempDir(): string {
+  if (process.env.ELECTRON_DB_PATH) {
+    const userDataDir = path.dirname(process.env.ELECTRON_DB_PATH);
+    return path.join(userDataDir, '.remotion-render');
+  }
+  return path.resolve(process.cwd(), '.remotion-render');
+}
+
+function getOutputDir(): string {
+  if (process.env.ELECTRON_DB_PATH) {
+    const userDataDir = path.dirname(process.env.ELECTRON_DB_PATH);
+    return path.join(userDataDir, 'renders');
+  }
+  return path.resolve(process.cwd(), 'public/assets/renders');
+}
+
+function getPublicDir(): string {
+  if (process.env.ELECTRON_DB_PATH) {
+    // In Electron, return userData as the public root
+    return path.dirname(process.env.ELECTRON_DB_PATH);
+  }
+  return path.resolve(process.cwd(), 'public');
+}
+
+function getOutputPathPrefix(): string {
+  return '/assets/renders';
+}
+
+// Get a safe working directory for spawning processes (for temp files)
+function getSafeWorkingDir(): string {
+  if (process.env.ELECTRON_DB_PATH) {
+    return path.dirname(process.env.ELECTRON_DB_PATH);
+  }
+  return process.cwd();
+}
+
+// Get the app root directory where node_modules with Remotion is installed
+// This is needed for npx to find the remotion package
+function getAppRootDir(): string {
+  if (process.env.ELECTRON_APP_ROOT) {
+    // ELECTRON_APP_ROOT points to dist/, we need to go up to the app root
+    return path.join(process.env.ELECTRON_APP_ROOT, '..');
+  }
+  return process.cwd();
+}
+
+// Find node executable in common paths (for Electron where PATH is limited)
+function findNodePath(): string {
+  if (process.env.ELECTRON_DB_PATH) {
+    const home = os.homedir();
+    const commonPaths = [
+      '/usr/local/bin/node',
+      '/opt/homebrew/bin/node',
+      path.join(home, '.nvm/versions/node', 'current', 'bin', 'node'),
+      path.join(home, '.local/bin/node'),
+      '/usr/bin/node',
+    ];
+
+    const fs = require('fs');
+    for (const nodePath of commonPaths) {
+      try {
+        fs.accessSync(nodePath, fs.constants.X_OK);
+        return nodePath;
+      } catch {
+        // Not found, try next
+      }
+    }
+
+    // Fall back to process.execPath (Electron's node)
+    return process.execPath;
+  }
+  return 'node';
+}
+
+// Get the path to the remotion CLI
+function getRemotionCliPath(): string {
+  const appRoot = getAppRootDir();
+  return path.join(appRoot, 'node_modules', '@remotion', 'cli', 'remotion-cli.js');
+}
+
+const TEMP_DIR = getTempDir();
+const OUTPUT_DIR = getOutputDir();
+const PUBLIC_DIR = getPublicDir();
 
 async function ensureDir(dir: string): Promise<void> {
   await fs.mkdir(dir, { recursive: true });
@@ -255,8 +337,19 @@ async function runRender(
     console.log(`[Render ${jobId}] Starting render with args:`, args.join(' '));
 
     await new Promise<void>((resolve) => {
-      const remotion = spawn('npx', ['remotion', ...args], {
-        cwd: process.cwd(),
+      // Build the command to run remotion CLI
+      const nodePath = findNodePath();
+      const remotionCliPath = getRemotionCliPath();
+      const fullCommand = `"${nodePath}" "${remotionCliPath}" ${args.map(a => `"${a}"`).join(' ')}`;
+
+      console.log(`[Render ${jobId}] Running command: ${fullCommand}`);
+
+      // Use app root directory as cwd so npx can find remotion in node_modules
+      const cwd = getAppRootDir();
+      console.log(`[Render ${jobId}] Working directory: ${cwd}`);
+
+      const remotion = spawn('/bin/bash', ['-c', fullCommand], {
+        cwd,
         env: { ...process.env },
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -276,8 +369,11 @@ async function runRender(
         }
       });
 
+      let stderrOutput = '';
       remotion.stderr.on('data', (data) => {
-        const lines = data.toString().split('\n');
+        const text = data.toString();
+        stderrOutput += text;
+        const lines = text.split('\n');
         for (const line of lines) {
           if (!line.trim()) continue;
           console.log(`[Render ${jobId}] stderr:`, line.trim());
@@ -300,7 +396,7 @@ async function runRender(
             await fs.access(outputPath);
             job.status = 'complete';
             job.progress = 100;
-            job.outputPath = `/assets/renders/${jobId}${extension}`;
+            job.outputPath = `${getOutputPathPrefix()}/${jobId}${extension}`;
             console.log(`[Render ${jobId}] SUCCESS - Output: ${job.outputPath}`);
           } catch {
             job.status = 'failed';
@@ -309,8 +405,19 @@ async function runRender(
           }
         } else {
           job.status = 'failed';
-          job.error = `Render process exited with code ${code}`;
+          // Include stderr output in error message for debugging
+          const errorDetails = stderrOutput.trim().slice(-500); // Last 500 chars
+          job.error = `Render process exited with code ${code}. ${errorDetails}`;
           console.error(`[Render ${jobId}] FAILED: Exit code ${code}`);
+          console.error(`[Render ${jobId}] stderr: ${stderrOutput}`);
+
+          // Also log to error file for Electron debugging
+          if (process.env.ELECTRON_DB_PATH) {
+            const errorLogPath = path.join(path.dirname(process.env.ELECTRON_DB_PATH), 'error.log');
+            const timestamp = new Date().toISOString();
+            const logMessage = `[${timestamp}] Render ${jobId} failed with code ${code}\nCommand: ${fullCommand}\nCWD: ${cwd}\nstderr: ${stderrOutput}\n\n`;
+            require('fs').appendFileSync(errorLogPath, logMessage);
+          }
         }
 
         // Cleanup temp files

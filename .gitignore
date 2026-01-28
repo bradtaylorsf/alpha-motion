@@ -45,3 +45,8 @@ public/assets/renders/*
 # Uploaded assets
 public/assets/uploaded/*
 !public/assets/uploaded/.gitkeep
+
+# Electron build artifacts
+electron-dist/
+electron-deploy/
+release/

@@ -4,7 +4,22 @@ import fs from 'fs/promises';
 import path from 'path';
 import { extractTransparency, deleteImageByPath } from './background-remover';
 
-const GENERATED_ASSETS_DIR = path.resolve(process.cwd(), 'public/assets/generated');
+// Get a safe directory for generated assets
+// In Electron, use userData; otherwise use local public folder
+function getGeneratedAssetsDir(): string {
+  if (process.env.ELECTRON_DB_PATH) {
+    const userDataDir = path.dirname(process.env.ELECTRON_DB_PATH);
+    return path.join(userDataDir, 'generated');
+  }
+  return path.resolve(process.cwd(), 'public/assets/generated');
+}
+
+// Get the public-facing path prefix for generated assets
+function getGeneratedAssetsPathPrefix(): string {
+  return '/assets/generated';
+}
+
+const GENERATED_ASSETS_DIR = getGeneratedAssetsDir();
 
 export interface GenerateImageOptions {
   prompt: string;
@@ -35,10 +50,10 @@ async function ensureDirectory(dir: string): Promise<void> {
   }
 }
 
-export async function generateImage(options: GenerateImageOptions): Promise<GeneratedImageResult> {
-  const apiKey = process.env.NANO_BANANAS_API_KEY;
+export async function generateImage(options: GenerateImageOptions & { apiKey?: string }): Promise<GeneratedImageResult> {
+  const apiKey = options.apiKey || process.env.GEMINI_API_KEY || process.env.NANO_BANANAS_API_KEY;
   if (!apiKey) {
-    throw new Error('NANO_BANANAS_API_KEY environment variable is not set');
+    throw new Error('Gemini API key is not configured. Set GEMINI_API_KEY environment variable or configure in Settings.');
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -85,7 +100,7 @@ export async function generateImage(options: GenerateImageOptions): Promise<Gene
   await fs.writeFile(absolutePath, buffer);
 
   // Return relative path for serving
-  const filePath = `/assets/generated/${filename}`;
+  const filePath = `${getGeneratedAssetsPathPrefix()}/${filename}`;
 
   return {
     id,
@@ -98,8 +113,23 @@ export async function generateImage(options: GenerateImageOptions): Promise<Gene
 
 export async function deleteImageFile(filePath: string): Promise<boolean> {
   try {
-    // Convert relative path to absolute
-    const absolutePath = path.join(process.cwd(), 'public', filePath);
+    let absolutePath: string;
+    if (process.env.ELECTRON_DB_PATH) {
+      // In Electron, assets are in userData directory
+      const userDataDir = path.dirname(process.env.ELECTRON_DB_PATH);
+      // filePath is like /assets/uploaded/xxx.png or /assets/generated/xxx.png
+      // Extract just the filename
+      const filename = path.basename(filePath);
+      // Check both possible directories
+      if (filePath.includes('/uploaded/') || filePath.includes('/generated/')) {
+        absolutePath = path.join(userDataDir, filePath.includes('/uploaded/') ? 'uploads' : 'generated', filename);
+      } else {
+        absolutePath = path.join(userDataDir, 'generated', filename);
+      }
+    } else {
+      // Development: use local public folder
+      absolutePath = path.join(process.cwd(), 'public', filePath);
+    }
     await fs.unlink(absolutePath);
     return true;
   } catch (error) {
@@ -108,10 +138,10 @@ export async function deleteImageFile(filePath: string): Promise<boolean> {
   }
 }
 
-export async function editImage(options: EditImageOptions): Promise<GeneratedImageResult> {
-  const apiKey = process.env.NANO_BANANAS_API_KEY;
+export async function editImage(options: EditImageOptions & { apiKey?: string }): Promise<GeneratedImageResult> {
+  const apiKey = options.apiKey || process.env.GEMINI_API_KEY || process.env.NANO_BANANAS_API_KEY;
   if (!apiKey) {
-    throw new Error('NANO_BANANAS_API_KEY environment variable is not set');
+    throw new Error('Gemini API key is not configured. Set GEMINI_API_KEY environment variable or configure in Settings.');
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -119,9 +149,23 @@ export async function editImage(options: EditImageOptions): Promise<GeneratedIma
   const model = options.model ?? 'gemini-2.5-flash-image';
 
   // Read source image and convert to base64
-  const absoluteSourcePath = options.sourceImagePath.startsWith('/')
-    ? path.join(process.cwd(), 'public', options.sourceImagePath)
-    : options.sourceImagePath;
+  let absoluteSourcePath: string;
+  if (options.sourceImagePath.startsWith('/')) {
+    if (process.env.ELECTRON_DB_PATH) {
+      // In Electron, resolve to userData directory
+      const userDataDir = path.dirname(process.env.ELECTRON_DB_PATH);
+      const filename = path.basename(options.sourceImagePath);
+      if (options.sourceImagePath.includes('/uploaded/')) {
+        absoluteSourcePath = path.join(userDataDir, 'uploads', filename);
+      } else {
+        absoluteSourcePath = path.join(userDataDir, 'generated', filename);
+      }
+    } else {
+      absoluteSourcePath = path.join(process.cwd(), 'public', options.sourceImagePath);
+    }
+  } else {
+    absoluteSourcePath = options.sourceImagePath;
+  }
 
   const imageBuffer = await fs.readFile(absoluteSourcePath);
   const base64Data = imageBuffer.toString('base64');
@@ -206,7 +250,7 @@ export async function editImage(options: EditImageOptions): Promise<GeneratedIma
   await fs.writeFile(absolutePath, buffer);
 
   // Return relative path for serving
-  const filePath = `/assets/generated/${filename}`;
+  const filePath = `${getGeneratedAssetsPathPrefix()}/${filename}`;
 
   return {
     id,
