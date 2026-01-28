@@ -25,12 +25,48 @@ fs.copyFileSync(
   path.join(deployDir, 'package.json')
 );
 
-// Use pnpm to install production dependencies
-console.log('Installing production dependencies with pnpm...');
-execSync('pnpm install --prod --shamefully-hoist --node-linker=hoisted', {
-  cwd: deployDir,
-  stdio: 'inherit',
-});
+// Use npm on Mac/Linux to avoid hardlink issues, pnpm on Windows
+const isWindows = process.platform === 'win32';
+if (isWindows) {
+  console.log('Installing production dependencies with pnpm (Windows)...');
+  execSync('pnpm install --prod --shamefully-hoist --node-linker=hoisted', {
+    cwd: deployDir,
+    stdio: 'inherit',
+  });
+} else {
+  console.log('Installing production dependencies with npm (Mac/Linux)...');
+  execSync('npm install --omit=dev --legacy-peer-deps', {
+    cwd: deployDir,
+    stdio: 'inherit',
+  });
+
+  // Break hardlinks on Mac/Linux by re-copying files through Node.js
+  console.log('Breaking hardlinks in node_modules (Mac/Linux)...');
+  const nodeModulesDir = path.join(deployDir, 'node_modules');
+  const tempDir = path.join(deployDir, 'node_modules_tmp');
+
+  function copyDirNoHardlinks(src, dest) {
+    if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+      const srcPath = path.join(src, entry.name);
+      const destPath = path.join(dest, entry.name);
+      if (entry.isDirectory()) {
+        copyDirNoHardlinks(srcPath, destPath);
+      } else if (entry.isSymbolicLink()) {
+        const target = fs.readlinkSync(srcPath);
+        fs.symlinkSync(target, destPath);
+      } else {
+        fs.copyFileSync(srcPath, destPath);
+        try { fs.chmodSync(destPath, fs.statSync(srcPath).mode); } catch {}
+      }
+    }
+  }
+
+  copyDirNoHardlinks(nodeModulesDir, tempDir);
+  fs.rmSync(nodeModulesDir, { recursive: true });
+  fs.renameSync(tempDir, nodeModulesDir);
+  console.log('Hardlinks broken');
+}
 
 // Break all hardlinks by copying files through Node.js
 // This is necessary because electron-builder's FileCopier fails on hardlinked files
