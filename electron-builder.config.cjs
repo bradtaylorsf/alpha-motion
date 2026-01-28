@@ -9,9 +9,18 @@ const config = {
     output: 'release',
     app: 'electron-deploy',
   },
-  files: ['**/*'],
-  // Disable asar to avoid hardlink conflicts during packaging
-  // This results in slightly larger app size but reliable builds
+  files: [
+    '**/*',
+    // Exclude files that cause duplicate hardlink issues
+    '!**/node_modules/@remotion/bundler/favicon.ico',
+    '!**/node_modules/@remotion/bundler/react-shim.js',
+    // Exclude source maps and unnecessary files
+    '!**/*.map',
+    '!**/*.md',
+    '!**/LICENSE*',
+    '!**/CHANGELOG*',
+  ],
+  // Disable asar to simplify packaging
   asar: false,
   npmRebuild: true,
   nodeGypRebuild: false,
