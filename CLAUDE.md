@@ -151,30 +151,30 @@ const STAGGER_DELAY = 5; // frames between each item
 })}
 ```
 
-## Common Imports
+## Runtime Harness (CRITICAL)
+
+Generated components are compiled **in-browser** via Babel and executed with `new Function()`.
+Import statements are stripped automatically and dependencies are injected by the preview harness.
+
+**Only these are available at runtime:**
+- `React` (full library, injected as a global)
+- From `remotion`: `AbsoluteFill`, `useCurrentFrame`, `useVideoConfig`, `interpolate`, `spring`, `Sequence`, `Series`, `Easing`, `Img`, `Audio`, `Video`, `staticFile`, `delayRender`, `continueRender`
 
 ```tsx
-// Core
+// ONLY import from 'react' and 'remotion' — these are the only packages available
+import React from 'react';
 import { AbsoluteFill, useCurrentFrame, useVideoConfig, Sequence } from 'remotion';
-import { interpolate, spring, Easing } from 'remotion';
-
-// Shapes (if needed)
-import { Rect, Circle, Triangle } from '@remotion/shapes';
-
-// Transitions (if needed)
-import { TransitionSeries, linearTiming, springTiming } from '@remotion/transitions';
-import { fade, slide, wipe } from '@remotion/transitions/fade';
-
-// 3D (if needed)
-import { ThreeCanvas } from '@remotion/three';
-
-// Lottie (if needed)
-import { Lottie } from '@remotion/lottie';
-
-// Google Fonts (if needed)
-import { loadFont } from '@remotion/google-fonts/Inter';
-const { fontFamily } = loadFont();
+import { interpolate, spring, Easing, Img } from 'remotion';
 ```
+
+**DO NOT import from these packages** (they are NOT available in the runtime):
+- `@remotion/shapes`
+- `@remotion/google-fonts`
+- `@remotion/three`
+- `@remotion/transitions`
+- `@remotion/lottie`
+
+For custom fonts, use a `<style>` tag with `@import url(...)` from Google Fonts CDN, or use web-safe fonts.
 
 ## What NOT to do
 
@@ -184,6 +184,7 @@ const { fontFamily } = loadFont();
 4. **Never use `Math.random()` without seed** - animations must be deterministic
 5. **Never import external images/videos** unless paths are provided
 6. **Never use `useEffect` for animations** - derive everything from `frame`
+7. **Never import from `@remotion/shapes`, `@remotion/google-fonts`, `@remotion/three`, etc.** - only `react` and `remotion` core are available in the browser harness
 
 ## Skill Categories
 

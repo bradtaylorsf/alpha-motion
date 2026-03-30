@@ -7,6 +7,7 @@ export interface AnimationIdea {
   duration: string;
   elements: string[];
   suggestedAssets: string[];
+  detailedPrompt?: string;
 }
 
 export interface GenerationSettings {

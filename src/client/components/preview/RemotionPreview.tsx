@@ -11,21 +11,27 @@ interface RemotionPreviewProps {
   durationInFrames?: number;
 }
 
-// Create a component factory that compiles source code
+function stripImportsAndExports(source: string): string {
+  let code = source;
+
+  // Remove multi-line and single-line import statements (handles `import { \n X, \n Y \n } from '...'`)
+  code = code.replace(/import\s+[\s\S]*?\s+from\s+['"][^'"]*['"];?/g, '');
+  // Remove side-effect imports (e.g. `import 'some-polyfill';`)
+  code = code.replace(/^import\s+['"][^'"]*['"];?\s*$/gm, '');
+  // Remove `export default X;`
+  code = code.replace(/^export\s+default\s+\w+;?\s*$/gm, '');
+  // Convert `export const/let/var/function/class X` -> `const/let/var/function/class X`
+  code = code.replace(/^export\s+(const|let|var|function|class)\s+/gm, '$1 ');
+  // Remove `export { X, Y };`
+  code = code.replace(/^export\s+\{[^}]*\};?\s*$/gm, '');
+
+  return code;
+}
+
 function compileComponent(sourceCode: string): React.FC | null {
   try {
-    // Strip out import/export statements - we'll inject the dependencies
-    const codeWithoutModules = sourceCode
-      // Remove import statements
-      .replace(/^import\s+.*?from\s+['"][^'"]+['"];?\s*$/gm, '')
-      // Remove "export default X;" at end
-      .replace(/^export\s+default\s+\w+;?\s*$/gm, '')
-      // Convert "export const X" -> "const X"
-      .replace(/^export\s+(const|let|var|function|class)\s+/gm, '$1 ')
-      // Remove "export { X, Y };"
-      .replace(/^export\s+\{[^}]*\};?\s*$/gm, '');
+    const codeWithoutModules = stripImportsAndExports(sourceCode);
 
-    // Transform JSX/TypeScript to JavaScript
     const transformed = Babel.transform(codeWithoutModules, {
       presets: ['react', 'typescript'],
       filename: 'component.tsx',
@@ -35,17 +41,14 @@ function compileComponent(sourceCode: string): React.FC | null {
       throw new Error('Babel transformation produced no code');
     }
 
-    // Create a function that returns the component
-    // We inject React and Remotion dependencies
     const wrappedCode = `
-      const { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Sequence, Easing, Img, Audio, Video, staticFile, delayRender, continueRender } = Remotion;
+      const { AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Sequence, Series, Easing, Img, Audio, Video, staticFile, delayRender, continueRender } = Remotion;
 
       ${transformed.code}
 
       return typeof MyAnimation !== 'undefined' ? MyAnimation : (typeof exports !== 'undefined' && exports.default ? exports.default : null);
     `;
 
-    // Create a function with React and Remotion in scope
     const factory = new Function('React', 'Remotion', 'exports', wrappedCode);
     const exports: { default?: React.FC } = {};
     const Component = factory(React, Remotion, exports);
@@ -57,7 +60,7 @@ function compileComponent(sourceCode: string): React.FC | null {
     return Component;
   } catch (error) {
     console.error('Failed to compile component:', error);
-    throw error; // Re-throw so the UI can show the error message
+    throw error;
   }
 }
 

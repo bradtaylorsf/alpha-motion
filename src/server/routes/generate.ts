@@ -70,7 +70,7 @@ router.get('/:jobId/status', async (req, res) => {
       const component = await createComponent({
         name: job.idea.title,
         description: job.idea.description,
-        promptUsed: `${job.idea.title}: ${job.idea.description}`,
+        promptUsed: job.idea.detailedPrompt || `${job.idea.title}: ${job.idea.description}`,
         idea: job.idea,
         sourceCode: job.result,
         tags: [

@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import os from 'os';
 import path from 'path';
 import type { AnimationIdea } from './anthropic';
+import { REMOTION_SKILLS } from './remotion-skills';
 
 // Get a safe working directory for spawning processes
 function getSafeWorkingDir(): string {
@@ -90,8 +91,13 @@ ${assets.map((a, i) => `const ASSET_${i + 1} = '${a.url}';`).join('\n')}
 `;
   }
 
-  return `Generate a Remotion component for this animation concept:
+  const detailedSection = idea.detailedPrompt ? `
+## Original Detailed Prompt (FOLLOW THIS CLOSELY)
+${idea.detailedPrompt}
+` : '';
 
+  return `Generate a Remotion component for this animation concept:
+${detailedSection}
 ## Animation Concept
 Title: ${idea.title}
 Description: ${idea.description}
@@ -101,11 +107,25 @@ Motion: ${idea.motion}
 Duration: ${idea.duration}
 Elements: ${idea.elements.join(', ')}
 ${assetSection}
+## Runtime Environment (CRITICAL)
+This component is compiled in-browser via Babel and executed with \`new Function()\`.
+Import statements are stripped automatically and dependencies are injected.
+
+**Available globals (these are injected — your imports will be removed at runtime):**
+- \`React\` — the full React library
+- From \`remotion\`: AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Sequence, Series, Easing, Img, Audio, Video, staticFile, delayRender, continueRender
+
+**You MUST NOT import from any package other than \`react\` and \`remotion\`.**
+Do NOT use: \`@remotion/shapes\`, \`@remotion/google-fonts\`, \`@remotion/three\`, \`@remotion/transitions\`, \`@remotion/lottie\`, or any other external package.
+For fonts, use inline \`style={{ fontFamily: '...' }}\` with web-safe fonts or Google Fonts loaded via a \`<style>\` tag with \`@import url(...)\`.
+
+${REMOTION_SKILLS}
+
 ## Requirements
 1. Export a React component named "MyAnimation" as the default export
 2. Define ALL customizable values (colors, text, sizes, timing) as NAMED CONSTANTS at the top
 3. The component must be self-contained and work immediately
-${hasAssets ? `4. CRITICAL: You MUST use ALL ${assets.length} provided image assets - import { Img } from "remotion"` : '4. Do NOT import external images or assets'}
+${hasAssets ? `4. CRITICAL: You MUST use ALL ${assets.length} provided image assets — use \`<Img src={URL} />\` from remotion` : '4. Do NOT import external images or assets'}
 
 ## Output
 Return ONLY the TypeScript/TSX code. No explanations, no markdown code blocks, just the raw code starting with import statements.`;
@@ -122,8 +142,8 @@ function getSuggestedUse(type: string): string {
 }
 
 function extractCode(output: string): string {
-  // Remove any markdown code blocks if present
-  let code = output.replace(/```(?:tsx?|javascript|jsx)?\n?/g, '').replace(/```$/g, '');
+  // Remove markdown code fences (opening and closing) wherever they appear
+  let code = output.replace(/```(?:tsx?|typescript|javascript|jsx)?\s*\n?/g, '');
 
   // Find the first import statement
   const importIndex = code.indexOf('import');
@@ -131,16 +151,24 @@ function extractCode(output: string): string {
     code = code.slice(importIndex);
   }
 
-  // Remove any trailing explanation text after the component
-  const exportDefaultIndex = code.lastIndexOf('export default');
-  if (exportDefaultIndex !== -1) {
-    const semicolonAfterExport = code.indexOf(';', exportDefaultIndex);
-    if (semicolonAfterExport !== -1) {
-      code = code.slice(0, semicolonAfterExport + 1);
+  // Find the last "export default <identifier>;" and trim trailing non-code text.
+  // Match the full export default statement (handles `export default MyAnimation;`)
+  const exportDefaultMatch = code.match(/export\s+default\s+\w+\s*;/g);
+  if (exportDefaultMatch) {
+    const lastMatch = exportDefaultMatch[exportDefaultMatch.length - 1];
+    const lastMatchIndex = code.lastIndexOf(lastMatch);
+    const endIndex = lastMatchIndex + lastMatch.length;
+    const trailing = code.slice(endIndex).trim();
+
+    // Only trim if what follows looks like non-code text (no braces, imports, or code-like patterns)
+    if (trailing && !/^[{(\/\*import|export|const|let|var|function|class|type|interface]/.test(trailing)) {
+      code = code.slice(0, endIndex);
     }
   }
 
-  return code.trim();
+  const result = code.trim();
+  console.log(`[extractCode] Input length: ${output.length}, Output length: ${result.length}`);
+  return result;
 }
 
 async function runGeneration(jobId: string): Promise<void> {
@@ -283,6 +311,19 @@ ${currentCode}
 ${assetSection}
 ## Edit Instructions
 ${editInstructions}
+
+## Runtime Environment (CRITICAL)
+This component is compiled in-browser via Babel and executed with \`new Function()\`.
+Import statements are stripped automatically and dependencies are injected.
+
+**Available globals (these are injected — your imports will be removed at runtime):**
+- \`React\` — the full React library
+- From \`remotion\`: AbsoluteFill, useCurrentFrame, useVideoConfig, interpolate, spring, Sequence, Series, Easing, Img, Audio, Video, staticFile, delayRender, continueRender
+
+**You MUST NOT import from any package other than \`react\` and \`remotion\`.**
+Do NOT use: \`@remotion/shapes\`, \`@remotion/google-fonts\`, \`@remotion/three\`, \`@remotion/transitions\`, \`@remotion/lottie\`, or any other external package.
+
+${REMOTION_SKILLS}
 
 ## Requirements
 1. Make ONLY the changes requested - preserve everything else

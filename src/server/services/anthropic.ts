@@ -20,6 +20,7 @@ export interface AnimationIdea {
   duration: string;
   elements: string[];
   suggestedAssets: string[];
+  detailedPrompt?: string;
 }
 
 const ANIMATION_CATEGORIES = [
@@ -135,13 +136,18 @@ export async function expandIdea(userIdea: string, apiKey?: string): Promise<Ani
     throw new Error('Unexpected response type');
   }
 
+  let idea: AnimationIdea;
   try {
-    return JSON.parse(content.text) as AnimationIdea;
+    idea = JSON.parse(content.text) as AnimationIdea;
   } catch {
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]) as AnimationIdea;
+      idea = JSON.parse(jsonMatch[0]) as AnimationIdea;
+    } else {
+      throw new Error('Failed to parse AI response as JSON');
     }
-    throw new Error('Failed to parse AI response as JSON');
   }
+
+  idea.detailedPrompt = userIdea;
+  return idea;
 }

@@ -257,6 +257,26 @@ export function IdeaEditModal({
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-6 space-y-6">
+          {/* Detailed Prompt (preserved from user input) */}
+          {idea.detailedPrompt && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-foreground">
+                  Your Original Prompt
+                </label>
+                <span className="text-xs text-muted-foreground">
+                  This is sent directly to the AI alongside the fields below
+                </span>
+              </div>
+              <textarea
+                value={idea.detailedPrompt}
+                onChange={(e) => setIdea({ ...idea, detailedPrompt: e.target.value })}
+                rows={4}
+                className="w-full rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 resize-y"
+              />
+            </div>
+          )}
+
           {/* Title & Description */}
           <div className="grid grid-cols-1 gap-4">
             <div>

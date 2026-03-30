@@ -14,7 +14,7 @@ const PORT = process.env.PORT || 3001;
 const isEmbedded = !!process.env.ELECTRON_DB_PATH;
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 
 // Serve generated assets
 const isElectron = !!process.env.ELECTRON_DB_PATH;

@@ -152,45 +152,64 @@ function transformAssetPaths(sourceCode: string): { code: string; hasAssets: boo
   return { code: transformed, hasAssets };
 }
 
+const REMOTION_SYMBOLS = [
+  'AbsoluteFill', 'useCurrentFrame', 'useVideoConfig',
+  'interpolate', 'spring', 'Sequence', 'Series', 'Easing',
+  'Img', 'Audio', 'Video', 'staticFile',
+  'delayRender', 'continueRender', 'Composition', 'registerRoot',
+];
+
 /**
- * Ensure staticFile is imported if assets are used.
+ * Scan source for Remotion symbols that are used but not imported,
+ * and ensure they all appear in a single `import {...} from 'remotion'` statement.
  */
-function ensureStaticFileImport(sourceCode: string): string {
-  // Check if staticFile is already imported
-  if (sourceCode.includes('staticFile')) {
-    // Check if it's actually imported from remotion
-    if (!sourceCode.includes("from 'remotion'") && !sourceCode.includes('from "remotion"')) {
-      return sourceCode;
+function ensureRemotionImports(sourceCode: string): string {
+  const usedSymbols = REMOTION_SYMBOLS.filter((sym) => {
+    const usage = new RegExp(`\\b${sym}\\b`);
+    return usage.test(sourceCode);
+  });
+
+  if (usedSymbols.length === 0) return sourceCode;
+
+  const remotionImportRegex = /import\s*\{([^}]+)\}\s*from\s*['"]remotion['"]\s*;?/g;
+  const matches = [...sourceCode.matchAll(remotionImportRegex)];
+
+  if (matches.length > 0) {
+    const alreadyImported = new Set<string>();
+    for (const m of matches) {
+      m[1].split(',').map(s => s.trim()).filter(Boolean).forEach(s => alreadyImported.add(s));
     }
 
-    // Check if staticFile is in the import
-    const remotionImportMatch = sourceCode.match(/import\s*\{([^}]+)\}\s*from\s*['"]remotion['"]/);
-    if (remotionImportMatch && remotionImportMatch[1]) {
-      const imports = remotionImportMatch[1];
-      if (!imports.includes('staticFile')) {
-        // Add staticFile to existing import
-        const newImports = imports.trim() + ', staticFile';
-        return sourceCode.replace(remotionImportMatch[0], `import {${newImports}} from 'remotion'`);
+    const missing = usedSymbols.filter(s => !alreadyImported.has(s));
+    if (missing.length === 0) return sourceCode;
+
+    const allImports = [...alreadyImported, ...missing];
+    const newImportStatement = `import { ${allImports.join(', ')} } from 'remotion';`;
+
+    let result = sourceCode;
+    let first = true;
+    for (const m of matches) {
+      if (first) {
+        result = result.replace(m[0], newImportStatement);
+        first = false;
+      } else {
+        result = result.replace(m[0], '');
       }
     }
-    return sourceCode;
+    return result;
   }
 
-  // Add staticFile to existing remotion import
-  const remotionImportMatch = sourceCode.match(/import\s*\{([^}]+)\}\s*from\s*['"]remotion['"]/);
-  if (remotionImportMatch && remotionImportMatch[1]) {
-    const imports = remotionImportMatch[1];
-    const newImports = imports.trim() + ', staticFile';
-    return sourceCode.replace(remotionImportMatch[0], `import {${newImports}} from 'remotion'`);
+  const importLine = `import { ${usedSymbols.join(', ')} } from 'remotion';\n`;
+  const reactImportMatch = sourceCode.match(/^import\s+.*['"]react['"].*$/m);
+  if (reactImportMatch) {
+    return sourceCode.replace(reactImportMatch[0], reactImportMatch[0] + '\n' + importLine);
   }
-
-  // No remotion import found, add one at the top
-  return `import { staticFile } from 'remotion';\n${sourceCode}`;
+  return importLine + sourceCode;
 }
 
 function generateEntryPoint(_componentPath: string, videoConfig: VideoConfig): string {
-  return `import { registerRoot } from 'remotion';
-import { Composition } from 'remotion';
+  return `import React from 'react';
+import { registerRoot, Composition } from 'remotion';
 import MyAnimation from './Component';
 
 const Root: React.FC = () => {
@@ -284,8 +303,13 @@ async function runRender(
     // Transform asset paths from URLs to staticFile() calls
     const { code: transformedCode, hasAssets } = transformAssetPaths(sourceCode);
 
-    // Ensure staticFile is imported if assets are used
-    const finalSource = hasAssets ? ensureStaticFileImport(transformedCode) : transformedCode;
+    // Ensure all used Remotion symbols are properly imported
+    let finalSource = ensureRemotionImports(transformedCode);
+
+    // Ensure React is imported (required for JSX in CLI rendering)
+    if (!finalSource.match(/import\s+.*['"]react['"]/)) {
+      finalSource = `import React from 'react';\n${finalSource}`;
+    }
 
     // Write component source
     const componentPath = path.join(jobDir, 'Component.tsx');
